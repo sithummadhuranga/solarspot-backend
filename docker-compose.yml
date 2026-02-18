@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      target: builder
+    container_name: solarspot_backend
+    restart: unless-stopped
+    volumes:
+      - ./src:/app/src
+      - ./app.ts:/app/app.ts
+      - ./server.ts:/app/server.ts
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - solarspot_network
+
+  mongo:
+    image: mongo:7-jammy
+    container_name: solarspot_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - solarspot_network
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: solarspot_mongo_ui
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo
+      - ME_CONFIG_BASICAUTH=false
+      - ME_CONFIG_MONGODB_ENABLE_ADMIN=true
+    depends_on:
+      - mongo
+    networks:
+      - solarspot_network
+
+volumes:
+  mongo_data:
+    name: solarspot_mongo_data
+
+networks:
+  solarspot_network:
+    name: solarspot_network
+    driver: bridge

@@ -1,0 +1,18 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render Deploy Hook
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" --fail
+
+      - name: Health check
+        run: |
+          sleep 90
+          curl --fail "${{ secrets.RENDER_API_URL }}/api/health"

@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  backend-test:
+    build:
+      context: .
+      target: builder
+    container_name: solarspot_test
+    environment:
+      - NODE_ENV=test
+      - JWT_SECRET=test_secret_32_chars_minimum_here
+      - JWT_REFRESH_SECRET=test_refresh_secret_32_chars_here
+      - JWT_ACCESS_EXPIRES=15m
+      - JWT_REFRESH_EXPIRES=7d
+      - FRONTEND_URL=http://localhost:3000
+    command: npm run test:integration
