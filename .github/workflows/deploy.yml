@@ -1,18 +1,74 @@
 name: Deploy to Render
 
+# Only runs after the CI workflow completes — never deploys if CI fails.
+# This means every merge to main must pass lint, typecheck, tests, and build
+# before a single byte reaches production.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
 
 jobs:
   deploy:
+    name: Deploy to Render (production)
     runs-on: ubuntu-latest
+    # Guard: skip if the CI run that triggered this workflow did not succeed.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     environment: production
-    steps:
-      - name: Trigger Render Deploy Hook
-        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" --fail
 
-      - name: Health check
+    steps:
+      # ── 1. Trigger Render deploy via the deploy hook ───────────────────────
+      - name: Trigger Render deploy hook
         run: |
-          sleep 90
-          curl --fail "${{ secrets.RENDER_API_URL }}/api/health"
+          RESPONSE=$(curl --silent --show-error --fail \
+            --write-out "\nHTTP_STATUS:%{http_code}" \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          echo "$RESPONSE"
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
+            echo "❌ Deploy hook returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "✅ Deploy hook accepted (HTTP $HTTP_STATUS) — Render is building..."
+
+      # ── 2. Poll the health endpoint until the new version is live ─────────
+      # Render free plan cold-starts can take 3-4 minutes on first deploy.
+      # We retry every 20 s for up to 5 minutes (15 attempts).
+      - name: Wait for deployment to become healthy
+        run: |
+          BASE_URL="${{ secrets.RENDER_API_URL }}"
+          MAX_ATTEMPTS=15
+          SLEEP_SECONDS=20
+
+          echo "Polling $BASE_URL/api/health ..."
+
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            HTTP_STATUS=$(curl --silent --output /dev/null \
+              --write-out "%{http_code}" \
+              "$BASE_URL/api/health" || echo "000")
+
+            echo "Attempt $i/$MAX_ATTEMPTS — HTTP $HTTP_STATUS"
+
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ Deployment is live and healthy!"
+              exit 0
+            fi
+
+            if [ "$i" -lt "$MAX_ATTEMPTS" ]; then
+              echo "Not ready yet, waiting ${SLEEP_SECONDS}s..."
+              sleep $SLEEP_SECONDS
+            fi
+          done
+
+          echo "❌ Health check failed after $((MAX_ATTEMPTS * SLEEP_SECONDS)) seconds."
+          echo "   Check Render dashboard for build/deploy logs."
+          exit 1
+
+      # ── 3. Confirm the deployed version details ────────────────────────────
+      - name: Print health response
+        if: success()
+        run: |
+          echo "=== Production Health ==="
+          curl --silent "${{ secrets.RENDER_API_URL }}/api/health" | \
+            python3 -m json.tool
