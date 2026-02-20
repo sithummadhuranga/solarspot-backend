@@ -27,6 +27,11 @@
     },
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
+  "ts-node": {
+    "require": ["tsconfig-paths/register"],
+    "transpileOnly": false,
+    "files": true
+  },
   "include": ["src/**/*.ts", "app.ts", "server.ts"],
   "exclude": ["node_modules", "dist", "src/tests"]
 }

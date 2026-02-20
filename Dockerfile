@@ -1,14 +1,18 @@
-# Stage 1: build
-FROM node:20-alpine AS builder
+# Stage 1: install all deps (dev + prod) — used by local dev
+FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
+COPY tsconfig.json nodemon.json ./
 RUN npm ci
+
+# Stage 2: compile TypeScript — used by production runner
+FROM deps AS builder
 COPY tsconfig.json ./
 COPY src ./src
 COPY app.ts server.ts ./
 RUN npm run build
 
-# Stage 2: production
+# Stage 3: lean production image
 FROM node:20-alpine AS runner
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app

@@ -1,16 +1,15 @@
-version: "3.9"
-
 services:
   backend:
     build:
       context: .
-      target: builder
+      target: deps
     container_name: solarspot_backend
     restart: unless-stopped
     volumes:
       - ./src:/app/src
       - ./app.ts:/app/app.ts
       - ./server.ts:/app/server.ts
+      - /app/node_modules
     ports:
       - "5000:5000"
     env_file:
