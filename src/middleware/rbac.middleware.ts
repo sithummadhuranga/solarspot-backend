@@ -4,6 +4,15 @@ import { container } from '@/container';
 import ApiError from '@utils/ApiError';
 import { PermissionAction } from '@/types';
 
+/** Role hierarchy — higher number = more permissions */
+export const ROLES = {
+  user: 1,
+  moderator: 2,
+  admin: 3,
+} as const;
+
+export type RoleName = keyof typeof ROLES;
+
 const PERMISSIONS: Record<string, RoleName[]> = {
   // ── Stations ───────────────────────────────────────────────────────────────
   'stations:create':      ['user', 'moderator', 'admin'],
