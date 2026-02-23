@@ -1,9 +1,20 @@
 import type { Config } from 'jest';
 
 const config: Config = {
-  preset: 'ts-jest',
+  // Use ts-jest preset but override the transform with explicit tsconfig
   testEnvironment: 'node',
   testMatch: ['**/tests/unit/**/*.test.ts'],
+
+  transform: {
+    '^.+\.tsx?$': [
+      'ts-jest',
+      {
+        // Point at a tsconfig that includes src/tests so path aliases resolve
+        tsconfig: '<rootDir>/tsconfig.test.json',
+      },
+    ],
+  },
+
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/tests/**',

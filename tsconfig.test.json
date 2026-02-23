@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Don't emit during tests — ts-jest transpiles in-memory
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": true,
+    "noImplicitReturns": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "app.ts",
+    "server.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

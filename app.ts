@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 // express-mongo-sanitize and hpp both reassign req.query which is a
 // read-only getter in Express 5 — replaced with inline implementations below.
 import compression from 'compression';
@@ -43,6 +44,7 @@ app.use(
 // ─── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(cookieParser());
 
 // ─── NoSQL injection sanitisation (Express-5-compatible) ───────────────────────
 // express-mongo-sanitize v2 reassigns req.query — illegal in Express 5 (read-only getter).
@@ -116,15 +118,15 @@ if (config.NODE_ENV !== 'production') {
   logger.info(`API docs available at /api/docs`);
 }
 
-// ─── Module routes (mount when implemented) ────────────────────────────────────
-// import authRouter     from '@modules/auth/auth.routes';
-// import usersRouter    from '@modules/users/user.routes';
+// ─── Module routes ─────────────────────────────────────────────────────────────
+import authRouter  from '@modules/users/auth.routes';
+import usersRouter from '@modules/users/user.routes';
 // import stationsRouter from '@modules/stations/station.routes';
 // import reviewsRouter  from '@modules/reviews/review.routes';
 // import weatherRouter  from '@modules/weather/weather.routes';
 
-// app.use('/api/auth',     authRouter);
-// app.use('/api/users',    usersRouter);
+app.use('/api/auth',  authRouter);
+app.use('/api/users', usersRouter);
 // app.use('/api/stations', stationsRouter);
 // app.use('/api/reviews',  reviewsRouter);
 // app.use('/api/weather',  weatherRouter);
