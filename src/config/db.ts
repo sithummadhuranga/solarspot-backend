@@ -1,10 +1,6 @@
 import mongoose from 'mongoose';
 import logger from '@utils/logger';
 
-/**
- * Connects to MongoDB using the MONGODB_URI environment variable.
- * Exits the process with code 1 if the connection fails.
- */
 export async function connectDB(): Promise<void> {
   const uri = process.env.MONGODB_URI as string;
 

@@ -9,9 +9,6 @@ interface PaginationMeta {
   hasPrev: boolean;
 }
 
-/**
- * ApiResponse — standardised JSON response helpers.
- */
 class ApiResponse {
   static success<T>(
     res: Response,

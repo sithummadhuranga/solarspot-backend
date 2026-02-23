@@ -5,7 +5,6 @@ import mongoose, {
 } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface IUserPreferences {
   defaultRadius?: number;
@@ -33,7 +32,6 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
 
-  // Instance methods
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -41,7 +39,6 @@ export interface IUserModel extends Model<IUser> {
   findByEmail(email: string): Promise<IUser | null>;
 }
 
-// ─── Schema ───────────────────────────────────────────────────────────────────
 
 const RFC5322 =
   /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
@@ -160,17 +157,9 @@ const userSchema = new Schema<IUser, IUserModel>(
   }
 );
 
-// ─── Indexes ──────────────────────────────────────────────────────────────────
-// Note: email unique index is declared inline (unique: true, sparse: true)
-// Note: role and isActive indexes are declared inline (index: true)
-// Compound index for soft-delete + role admin queries
 userSchema.index({ isActive: 1, role: 1 });
 
-// ─── Pre-save hook — hash password ────────────────────────────────────────────
-
 userSchema.pre('save', async function () {
-  // `this` is the document being saved
-  // Mongoose 6+ supports async pre-save without calling next()
   if (!this.isModified('password')) return;
 
   const salt = await bcrypt.genSalt(12);
@@ -180,7 +169,6 @@ userSchema.pre('save', async function () {
   );
 });
 
-// ─── Instance methods ─────────────────────────────────────────────────────────
 
 userSchema.methods.comparePassword = async function (
   candidatePassword: string
@@ -188,13 +176,11 @@ userSchema.methods.comparePassword = async function (
   return bcrypt.compare(candidatePassword, this.password as string);
 };
 
-// ─── Static methods ───────────────────────────────────────────────────────────
 
 userSchema.statics.findByEmail = function (email: string): Promise<IUser | null> {
   return this.findOne({ email: email.toLowerCase().trim() }).select('+password');
 };
 
-// ─── Export ───────────────────────────────────────────────────────────────────
 
 const User = mongoose.model<IUser, IUserModel>('User', userSchema);
 export default User;

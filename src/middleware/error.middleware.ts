@@ -4,16 +4,11 @@ import jwt from 'jsonwebtoken';
 import ApiError from '@utils/ApiError';
 import logger from '@utils/logger';
 
-// Minimal types for Mongo driver errors surfaced through Mongoose
 interface MongoServerError extends Error {
   code?: number;
   keyValue?: Record<string, unknown>;
 }
 
-/**
- * Global error-handling middleware.
- * Must be mounted LAST in app.ts after all routes.
- */
 export const errorHandler = (
   err: Error,
   req: Request,
@@ -22,7 +17,6 @@ export const errorHandler = (
 ): void => {
   const isProd = process.env.NODE_ENV === 'production';
 
-  // ─── Operational errors (ApiError) ───────────────────────────────────────
   if (err instanceof ApiError) {
     logger.warn(`[${err.statusCode}] ${req.method} ${req.originalUrl} — ${err.message}`);
     res.status(err.statusCode).json({
@@ -34,7 +28,6 @@ export const errorHandler = (
     return;
   }
 
-  // ─── Mongoose ValidationError ──────────────────────────────────────────────
   if (err instanceof MongooseError.ValidationError) {
     const errors = Object.values(err.errors).map((e) => e.message);
     logger.warn(`[422] ${req.method} ${req.originalUrl} — Validation: ${errors.join('; ')}`);
@@ -47,7 +40,6 @@ export const errorHandler = (
     return;
   }
 
-  // ─── Mongoose CastError (invalid ObjectId, etc.) ─────────────────────────────
   if (err instanceof MongooseError.CastError) {
     logger.warn(`[404] ${req.method} ${req.originalUrl} — CastError: ${err.message}`);
     res.status(404).json({
@@ -59,7 +51,6 @@ export const errorHandler = (
     return;
   }
 
-  // ─── MongoDB duplicate key (code 11000) ──────────────────────────────────────
   const mongoErr = err as MongoServerError;
   if (mongoErr.code === 11000 && mongoErr.keyValue) {
     const field = Object.keys(mongoErr.keyValue)[0];
@@ -74,7 +65,6 @@ export const errorHandler = (
     return;
   }
 
-  // ─── JWT errors ───────────────────────────────────────────────────────────────
   if (err instanceof jwt.TokenExpiredError) {
     res.status(401).json({
       success: false,
@@ -95,7 +85,6 @@ export const errorHandler = (
     return;
   }
 
-  // ─── Unhandled / generic errors ─────────────────────────────────────────────────
   logger.error(`[500] ${req.method} ${req.originalUrl} — ${err.message}`, {
     stack: isProd ? undefined : err.stack,
   });

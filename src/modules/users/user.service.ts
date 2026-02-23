@@ -4,12 +4,6 @@ import User from '@modules/users/user.model';
 import ApiError from '@utils/ApiError';
 import logger from '@utils/logger';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Get counts from Station and Review collections.
- * Falls back to 0 if those models have not been registered yet.
- */
 async function getCounts(userId: string): Promise<{ stationCount: number; reviewCount: number }> {
   let stationCount = 0;
   let reviewCount = 0;
@@ -33,7 +27,6 @@ async function getCounts(userId: string): Promise<{ stationCount: number; review
   return { stationCount, reviewCount };
 }
 
-// ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const updateMeSchema = Joi.object({
   displayName: Joi.string().min(2).max(50).optional(),
@@ -49,8 +42,6 @@ const updateMeSchema = Joi.object({
 const validRoles = ['user', 'moderator', 'admin'] as const;
 type ValidRole = typeof validRoles[number];
 
-// ─── Pagination helper ────────────────────────────────────────────────────────
-
 interface PaginationOptions {
   page?: number;
   limit?: number;
@@ -64,11 +55,6 @@ interface AdminFilters {
   search?: string;
 }
 
-// ─── Service Functions ────────────────────────────────────────────────────────
-
-/**
- * Return a rich profile for the currently authenticated user.
- */
 export async function getMe(userId: string): Promise<Record<string, unknown>> {
   const user = await User.findById(userId).select(
     '_id email displayName avatarUrl role bio preferences isEmailVerified lastLoginAt createdAt'
@@ -94,10 +80,6 @@ export async function getMe(userId: string): Promise<Record<string, unknown>> {
   };
 }
 
-/**
- * Update the authenticated user's own profile.
- * Allowed fields: displayName, avatarUrl, bio, preferences.
- */
 export async function updateMe(
   userId: string,
   updates: Record<string, unknown>
@@ -132,9 +114,6 @@ export async function updateMe(
   };
 }
 
-/**
- * Return a public (non-sensitive) profile for any user.
- */
 export async function getPublicProfile(userId: string): Promise<Record<string, unknown>> {
   const user = await User.findById(userId).select(
     '_id displayName avatarUrl bio createdAt isActive'
@@ -155,9 +134,6 @@ export async function getPublicProfile(userId: string): Promise<Record<string, u
   };
 }
 
-/**
- * Admin: list all users with rich filtering, search, and pagination.
- */
 export async function adminListUsers(
   filters: AdminFilters,
   pagination: PaginationOptions
@@ -171,7 +147,6 @@ export async function adminListUsers(
   const limit = Math.min(50, Math.max(1, pagination.limit ?? 10));
   const skip = (page - 1) * limit;
 
-  // Build filter query
   const query: Record<string, unknown> = {};
 
   if (filters.role) query.role = filters.role;
@@ -182,7 +157,6 @@ export async function adminListUsers(
     query.$or = [{ email: regex }, { displayName: regex }];
   }
 
-  // Sort options
   const sortMap: Record<string, Record<string, number>> = {
     createdAt: { createdAt: -1 },
     displayName: { displayName: 1 },
@@ -208,10 +182,6 @@ export async function adminListUsers(
   };
 }
 
-/**
- * Admin: change a user's role.
- * Guards: cannot change own role, cannot demote the last admin.
- */
 export async function adminChangeRole(
   adminId: string,
   targetUserId: string,
@@ -228,7 +198,6 @@ export async function adminChangeRole(
   const targetUser = await User.findById(targetUserId);
   if (!targetUser) throw new ApiError(404, 'User not found');
 
-  // Prevent demoting the last admin
   if (targetUser.role === 'admin' && newRole !== 'admin') {
     const adminCount = await User.countDocuments({ role: 'admin', isActive: true });
     if (adminCount <= 1) {
@@ -250,9 +219,6 @@ export async function adminChangeRole(
   };
 }
 
-/**
- * Admin: soft-delete a user (anonymise email, deactivate, force logout).
- */
 export async function adminSoftDeleteUser(
   adminId: string,
   targetUserId: string

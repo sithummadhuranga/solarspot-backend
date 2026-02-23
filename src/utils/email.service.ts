@@ -2,19 +2,17 @@ import nodemailer from 'nodemailer';
 import { config } from '@config/env';
 import logger from '@utils/logger';
 
-// ─── Transport ────────────────────────────────────────────────────────────────
 
 const transporter = nodemailer.createTransport({
   host: config.BREVO_SMTP_HOST,
   port: Number(config.BREVO_SMTP_PORT ?? 587),
-  secure: false, // STARTTLS on port 587
+  secure: false, 
   auth: {
     user: config.BREVO_SMTP_USER,
     pass: config.BREVO_SMTP_PASS,
   },
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const baseTemplate = (title: string, body: string): string => `
 <!DOCTYPE html>
@@ -52,14 +50,6 @@ const baseTemplate = (title: string, body: string): string => `
 </html>
 `;
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/**
- * Send an email verification link to a newly registered user.
- * @param to            - Recipient email address
- * @param displayName   - User's display name (used in greeting)
- * @param verificationToken - RAW (unhashed) token; hashed version stored in DB
- */
 export async function sendVerificationEmail(
   to: string,
   displayName: string,
@@ -87,12 +77,6 @@ export async function sendVerificationEmail(
   logger.info(`Verification email sent to ${to}`);
 }
 
-/**
- * Send a password reset link.
- * @param to         - Recipient email address
- * @param displayName - User's display name
- * @param resetToken  - RAW (unhashed) token; hashed version stored in DB
- */
 export async function sendPasswordResetEmail(
   to: string,
   displayName: string,
@@ -121,13 +105,6 @@ export async function sendPasswordResetEmail(
   logger.info(`Password reset email sent to ${to}`);
 }
 
-/**
- * Notify a user that their station submission was not approved.
- * @param to              - Recipient email address
- * @param displayName     - User's display name
- * @param stationName     - Name of the rejected station
- * @param rejectionReason - Moderator's rejection reason
- */
 export async function sendStationRejectionEmail(
   to: string,
   displayName: string,

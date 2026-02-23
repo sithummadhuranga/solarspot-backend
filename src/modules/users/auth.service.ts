@@ -55,7 +55,7 @@ export async function register(
 
   const user = await User.create({
     email,
-    password,   // pre-save hook will hash it
+    password,   
     displayName,
     emailVerifyToken: hashedToken,
     emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // +24h
@@ -65,7 +65,6 @@ export async function register(
     await emailService.sendVerificationEmail(user.email, user.displayName, rawToken);
   } catch (err) {
     logger.error('Failed to send verification email', { userId: user._id, err });
-    // Non-fatal — user can request resend later
   }
 
   logger.info('User registered', { userId: user._id, email: user.email });
@@ -78,10 +77,6 @@ export async function register(
   };
 }
 
-/**
- * Verify an email address using the token sent during registration.
- * Returns JWT access + refresh tokens on success.
- */
 export async function verifyEmail(token: string): Promise<Tokens & { user: Record<string, unknown> }> {
   const hashedToken = sha256(token);
 
@@ -115,17 +110,12 @@ export async function verifyEmail(token: string): Promise<Tokens & { user: Recor
   };
 }
 
-/**
- * Authenticate a user by email + password.
- * Returns access token, refresh token, and safe user object.
- */
 export async function login(
   email: string,
   password: string
 ): Promise<Tokens & { user: Record<string, unknown> }> {
   const user = await User.findByEmail(email);
 
-  // Use same message for missing user and wrong password — prevents enumeration
   const credentialsError = new ApiError(401, 'Invalid credentials');
 
   if (!user) throw credentialsError;
@@ -165,17 +155,11 @@ export async function login(
   };
 }
 
-/**
- * Invalidate the stored refresh token (log out a user from all devices).
- */
 export async function logout(userId: string): Promise<void> {
   await User.findByIdAndUpdate(userId, { refreshToken: null });
   logger.info('User logged out', { userId });
 }
 
-/**
- * Verify an incoming refresh token, rotate it, and issue new access + refresh tokens.
- */
 export async function refreshAccessToken(incomingRefreshToken: string): Promise<Tokens> {
   let payload: jwt.JwtPayload;
 
@@ -205,10 +189,6 @@ export async function refreshAccessToken(incomingRefreshToken: string): Promise<
   return tokens;
 }
 
-/**
- * Send a password reset email if the email belongs to an existing account.
- * Always returns a success message to prevent account enumeration.
- */
 export async function forgotPassword(email: string): Promise<{ message: string }> {
   const user = await User.findOne({ email: email.toLowerCase().trim() });
 
@@ -232,10 +212,6 @@ export async function forgotPassword(email: string): Promise<{ message: string }
   return { message: 'If an account exists, a reset link has been sent' };
 }
 
-/**
- * Reset a user's password using the token sent via email.
- * Invalidates all existing sessions on success.
- */
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
   const hashedToken = sha256(token);
 
@@ -248,10 +224,10 @@ export async function resetPassword(token: string, newPassword: string): Promise
     throw new ApiError(400, 'Invalid or expired reset token');
   }
 
-  user.password = newPassword; // pre-save hook will hash it
+  user.password = newPassword; 
   user.passwordResetToken = null;
   user.passwordResetExpires = null;
-  user.refreshToken = null; // invalidate all active sessions
+  user.refreshToken = null; 
   await user.save();
 
   logger.info('Password reset successfully', { userId: user._id });

@@ -1,15 +1,7 @@
-/**
- * Unit tests for auth.service.ts
- *
- * All external dependencies (User model, email service, jwt) are mocked
- * so these tests run in-process, no real DB or network calls needed.
- */
-
 import crypto from 'crypto';
 import * as authService from '@modules/users/auth.service';
 import ApiError from '@utils/ApiError';
 
-// ─── Mocks ────────────────────────────────────────────────────────────────────
 
 jest.mock('@modules/users/user.model');
 jest.mock('@utils/email.service');
@@ -23,7 +15,6 @@ const MockUser = User as jest.Mocked<typeof User>;
 const mockJwt = jwt as jest.Mocked<typeof jwt>;
 const mockEmail = emailService as jest.Mocked<typeof emailService>;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function sha256(data: string): string {
   return crypto.createHash('sha256').update(data).digest('hex');
@@ -50,13 +41,11 @@ function makeMockUser(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('authService.register()', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('creates a user and sends a verification email', async () => {
-    // No existing user
     MockUser.findOne = jest.fn().mockResolvedValue(null);
 
     const savedUser = makeMockUser();

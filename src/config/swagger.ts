@@ -66,7 +66,6 @@ const options: swaggerJsdoc.Options = {
     },
     security: [{ bearerAuth: [] }],
   },
-  // Scan all route files for @swagger JSDoc blocks
   apis: ['./src/modules/**/*.routes.ts'],
 };
 

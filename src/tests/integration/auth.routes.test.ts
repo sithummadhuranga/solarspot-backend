@@ -1,24 +1,16 @@
-/**
- * Integration tests for auth & admin routes.
- * Uses MongoMemoryServer (started via globalSetup) and Supertest.
- */
-
 import request from 'supertest';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 import app from '../../../app';
 import User from '@modules/users/user.model';
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
 
 function sha256(data: string): string {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
-// ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeAll(async () => {
-  // globalSetup sets process.env.MONGODB_URI
   await mongoose.connect(process.env.MONGODB_URI as string);
 });
 
@@ -28,11 +20,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // Clean only user collection between tests
   await User.deleteMany({});
 });
-
-// ─── POST /api/auth/register ──────────────────────────────────────────────────
 
 describe('POST /api/auth/register', () => {
   it('returns 201 and user data on valid input', async () => {
@@ -64,13 +53,11 @@ describe('POST /api/auth/register', () => {
   it('returns 400 when required fields are missing', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'missing-fields@example.com' }); // no password or displayName
+      .send({ email: 'missing-fields@example.com' }); 
 
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });
-
-// ─── GET /api/auth/verify-email/:token ────────────────────────────────────────
 
 describe('GET /api/auth/verify-email/:token', () => {
   it('returns 200 and access token on valid token', async () => {
@@ -99,14 +86,11 @@ describe('GET /api/auth/verify-email/:token', () => {
   });
 });
 
-// ─── POST /api/auth/login ─────────────────────────────────────────────────────
-
 describe('POST /api/auth/login', () => {
   let verifiedUserPass: string;
 
   beforeEach(async () => {
     verifiedUserPass = 'Password123!';
-    // Create a verified user — hash is handled by pre-save hook
     await User.create({
       email: 'carol@example.com',
       password: verifiedUserPass,
@@ -152,11 +136,8 @@ describe('POST /api/auth/login', () => {
   });
 });
 
-// ─── POST /api/auth/logout ────────────────────────────────────────────────────
-
 describe('POST /api/auth/logout', () => {
   it('returns 204 and clears the cookie', async () => {
-    // Register + verify + login to get a valid access token
     const rawVerifyToken = crypto.randomBytes(32).toString('hex');
     const user = await User.create({
       email: 'dave@example.com',
@@ -181,8 +162,6 @@ describe('POST /api/auth/logout', () => {
     expect(logoutRes.status).toBe(204);
   });
 });
-
-// ─── POST /api/auth/refresh ───────────────────────────────────────────────────
 
 describe('POST /api/auth/refresh', () => {
   it('returns 200 with new accessToken when refresh cookie is valid', async () => {
@@ -216,8 +195,6 @@ describe('POST /api/auth/refresh', () => {
   });
 });
 
-// ─── POST /api/auth/forgot-password ──────────────────────────────────────────
-
 describe('POST /api/auth/forgot-password', () => {
   it('always returns 200 regardless of whether email exists', async () => {
     const res = await request(app)
@@ -228,8 +205,6 @@ describe('POST /api/auth/forgot-password', () => {
     expect(res.body.message).toBe('If an account exists, a reset link has been sent');
   });
 });
-
-// ─── PATCH /api/auth/reset-password/:token ────────────────────────────────────
 
 describe('PATCH /api/auth/reset-password/:token', () => {
   it('returns 200 when token is valid and not expired', async () => {
@@ -261,11 +236,8 @@ describe('PATCH /api/auth/reset-password/:token', () => {
   });
 });
 
-// ─── GET /api/users/admin/users ───────────────────────────────────────────────
-
 describe('GET /api/users/admin/users', () => {
   it('returns 200 and paginated users for admin role', async () => {
-    // Create admin user and log in
     await User.create({
       email: 'admin@example.com',
       password: 'AdminPass1!',

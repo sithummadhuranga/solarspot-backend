@@ -6,10 +6,7 @@ import { config } from '@config/env';
 import User from '@modules/users/user.model';
 import logger from '@utils/logger';
 
-// ─── Extend Express Request ───────────────────────────────────────────────────
-
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: {
@@ -23,7 +20,6 @@ declare global {
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function extractAndVerifyUser(req: Request): Promise<void> {
   const authHeader = req.headers.authorization;
@@ -62,13 +58,6 @@ async function extractAndVerifyUser(req: Request): Promise<void> {
   };
 }
 
-// ─── Middleware ───────────────────────────────────────────────────────────────
-
-/**
- * protect — requires a valid JWT access token.
- * Attaches decoded + DB-verified user to req.user.
- * Throws ApiError on any failure.
- */
 export const protect = asyncHandler(
   async (req: Request, _res: Response, next: NextFunction) => {
     await extractAndVerifyUser(req);
@@ -76,10 +65,6 @@ export const protect = asyncHandler(
   }
 );
 
-/**
- * optionalAuth — attaches req.user if a valid token is present.
- * Silently continues without attaching user if token is missing or invalid.
- */
 export const optionalAuth = asyncHandler(
   async (req: Request, _res: Response, next: NextFunction) => {
     try {

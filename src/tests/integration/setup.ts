@@ -1,14 +1,7 @@
-/**
- * Integration setup: start a MongoMemoryServer and expose its URI via global.
- * Jest globalSetup runs this in a separate VM context — mongoose connections
- * are made per-test-file via beforeAll/afterAll inside the test file itself.
- */
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 declare global {
-  // eslint-disable-next-line no-var
   var __MONGO_URI__: string;
-  // eslint-disable-next-line no-var
   var __MONGOD__: MongoMemoryServer;
 }
 
@@ -21,7 +14,6 @@ export default async function setup(): Promise<void> {
   global.__MONGO_URI__ = mongod.getUri();
   process.env.MONGODB_URI = mongod.getUri();
 
-  // Required env vars for the app to boot without crashing
   process.env.JWT_SECRET          = 'test-jwt-secret-32-chars-minimum!!';
   process.env.JWT_REFRESH_SECRET  = 'test-refresh-secret-32-chars-min!';
   process.env.JWT_ACCESS_EXPIRES  = '15m';
