@@ -10,7 +10,8 @@
 import { Response } from 'express';
 import asyncHandler from '@middleware/asyncHandler';
 import ApiResponse  from '@utils/ApiResponse';
-import AuthService from './auth.service';
+// TODO: Member 4 — uncomment when implementing handlers:
+// import AuthService from './auth.service';
 import { AuthRequest } from '@/types';
 
 /** POST /api/auth/register */

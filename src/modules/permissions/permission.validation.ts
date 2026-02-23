@@ -6,7 +6,8 @@
 
 import Joi from 'joi';
 
-const objectId = () => Joi.string().hex().length(24);
+// TODO: Member 4 — add objectId helper: const objectId = () => Joi.string().hex().length(24);
+//   then uncomment the field rules in each schema below.
 
 /** POST /admin/roles/:id/permissions */
 export const assignRolePermSchema = Joi.object({

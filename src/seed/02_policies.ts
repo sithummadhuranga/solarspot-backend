@@ -43,7 +43,7 @@ export const POLICIES_SEED: PolicySeed[] = [
   { name: 'Station Approved',            slug: 'station_approved',        condition: 'field_equals',     effect: 'allow', config: { field: 'status', value: 'approved' }, isSystem: true },
 ];
 
-export async function seedPolicies(session: ClientSession): Promise<void> {
+export async function seedPolicies(_session: ClientSession): Promise<void> {
   // TODO: Member 4 — upsert all 13 policies using POLICIES_SEED above
   // Use { slug } as the filter key for upsert (idempotent re-runs)
   logger.warn('seedPolicies: not yet implemented');

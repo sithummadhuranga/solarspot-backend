@@ -27,7 +27,7 @@ export const DEMO_STATIONS: unknown[] = [
   // }
 ];
 
-export async function seedDemoStations(session: ClientSession): Promise<void> {
+export async function seedDemoStations(_session: ClientSession): Promise<void> {
   // TODO: Member 4 — implement upsert logic once DEMO_STATIONS is filled
   logger.warn('seedDemoStations: not yet implemented');
 }

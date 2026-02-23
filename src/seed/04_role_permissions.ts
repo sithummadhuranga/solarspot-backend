@@ -22,7 +22,7 @@ import logger from '@utils/logger';
 // import { Policy }         from '@modules/permissions/policy.model';
 // import { RolePermission } from '@modules/permissions/role_permission.model';
 
-export async function seedRolePermissions(session: ClientSession): Promise<void> {
+export async function seedRolePermissions(_session: ClientSession): Promise<void> {
   // TODO: Member 4 — implement the full role → permission → policy matrix
   //
   // Approach:

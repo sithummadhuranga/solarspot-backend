@@ -64,7 +64,8 @@ export interface CreateStationInput {
   // TODO: Member 1 — add connector types, amenities etc.
 }
 
-export interface UpdateStationInput extends Partial<CreateStationInput> {}
+// TODO: Member 1 — extend with additional patch-only fields if needed
+export type UpdateStationInput = Partial<CreateStationInput>;
 
 export interface RejectStationInput {
   rejectionReason: string;

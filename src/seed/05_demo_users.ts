@@ -27,7 +27,7 @@ export const DEMO_USERS = [
   { email: 'unverified@solarspot.app',  password: 'User@2026!',   role: 'user',          displayName: 'Unverified User',isEmailVerified: false },
 ];
 
-export async function seedDemoUsers(session: ClientSession): Promise<void> {
+export async function seedDemoUsers(_session: ClientSession): Promise<void> {
   // TODO: Member 4 — implement
   // 1. For each demo user, resolve the role ObjectId from ROLES_SEED
   // 2. Hash passwords with bcrypt (rounds: 12)

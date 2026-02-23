@@ -55,7 +55,7 @@ export class PermissionEngine {
   async evaluate(
     user: IUserForPermission,
     action: PermissionAction,
-    resource?: Document,
+    _resource?: Document,
   ): Promise<EvaluationResult> {
     // TODO: Member 4 — implement full evaluation logic
     // See MASTER_PROMPT.md → Permission System for the algorithm
@@ -68,7 +68,7 @@ export class PermissionEngine {
    * Must be called after ANY mutation to: roles, permissions, policies,
    * role_permissions, or user_permission_overrides.
    */
-  flush(userId?: string): void {
+  flush(_userId?: string): void {
     // TODO: Member 4 — implement cache invalidation
     // If userId provided: flush only that user's cache entry
     // If omitted: flush entire permission graph cache

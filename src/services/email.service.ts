@@ -99,43 +99,43 @@ export class EmailService {
   // OCP: add a new template = add one method here + one HTML file in /templates
 
   /** Triggered: POST /api/auth/register */
-  async sendVerifyEmail(user: IUserForEmail, verifyUrl: string): Promise<void> {
+  async sendVerifyEmail(_user: IUserForEmail, _verifyUrl: string): Promise<void> {
     // TODO: Member 4 — implement
     logger.warn('EmailService.sendVerifyEmail: not yet implemented');
   }
 
   /** Triggered: POST /api/auth/forgot-password */
-  async sendPasswordReset(user: IUserForEmail, resetUrl: string): Promise<void> {
+  async sendPasswordReset(_user: IUserForEmail, _resetUrl: string): Promise<void> {
     // TODO: Member 4 — implement
     logger.warn('EmailService.sendPasswordReset: not yet implemented');
   }
 
   /** Triggered: GET /api/auth/verify-email/:token (after successful verification) */
-  async sendWelcome(user: IUserForEmail): Promise<void> {
+  async sendWelcome(_user: IUserForEmail): Promise<void> {
     // TODO: Member 4 — implement
     logger.warn('EmailService.sendWelcome: not yet implemented');
   }
 
   /** Triggered: PATCH /api/stations/:id/approve */
-  async sendStationApproved(user: IUserForEmail, stationName: string, stationUrl: string): Promise<void> {
+  async sendStationApproved(_user: IUserForEmail, _stationName: string, _stationUrl: string): Promise<void> {
     // TODO: Member 4 — implement
     logger.warn('EmailService.sendStationApproved: not yet implemented');
   }
 
   /** Triggered: PATCH /api/stations/:id/reject */
-  async sendStationRejected(user: IUserForEmail, stationName: string, reason: string): Promise<void> {
+  async sendStationRejected(_user: IUserForEmail, _stationName: string, _reason: string): Promise<void> {
     // TODO: Member 4 — implement
     logger.warn('EmailService.sendStationRejected: not yet implemented');
   }
 
   /** Triggered: QuotaService when 80% threshold is hit */
-  async sendQuotaAlert(adminEmail: string, serviceName: string, percentage: number, todayCount: number): Promise<void> {
+  async sendQuotaAlert(_adminEmail: string, _serviceName: string, _percentage: number, _todayCount: number): Promise<void> {
     // TODO: Member 4 — implement
     logger.warn('EmailService.sendQuotaAlert: not yet implemented');
   }
 
   /** Triggered: POST /api/permissions/users/:id/overrides */
-  async sendPermissionChange(user: IUserForEmail, changedBy: IUserForEmail, changeDescription: string, effect: 'grant' | 'deny'): Promise<void> {
+  async sendPermissionChange(_user: IUserForEmail, _changedBy: IUserForEmail, _changeDescription: string, _effect: 'grant' | 'deny'): Promise<void> {
     // TODO: Member 4 — implement
     logger.warn('EmailService.sendPermissionChange: not yet implemented');
   }

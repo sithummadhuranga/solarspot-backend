@@ -68,7 +68,7 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
   { action: 'notifications.read-own',  resource: 'notifications', component: 'permissions', description: 'Read own notifications' },
 ];
 
-export async function seedPermissions(session: ClientSession): Promise<void> {
+export async function seedPermissions(_session: ClientSession): Promise<void> {
   // TODO: Member 4 — upsert all 35 permissions using PERMISSIONS_SEED above
   // Use { action } as the filter key for upsert (idempotent re-runs)
   logger.warn('seedPermissions: not yet implemented');

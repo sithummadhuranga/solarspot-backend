@@ -39,7 +39,7 @@ export const ROLES_SEED: RoleSeed[] = [
   { name: 'admin',                displayName: 'Administrator',        roleLevel: 4, isSystem: true  },
 ];
 
-export async function seedRoles(session: ClientSession): Promise<void> {
+export async function seedRoles(_session: ClientSession): Promise<void> {
   // TODO: Member 4 — upsert all 10 roles using ROLES_SEED above
   // Use { name } as the filter key for upsert (idempotent re-runs)
   logger.warn('seedRoles: not yet implemented');

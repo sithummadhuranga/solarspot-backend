@@ -17,7 +17,7 @@ import logger from '@utils/logger';
 // TODO: Member 4 — import SystemMeta model when implemented
 // import { SystemMeta } from '@modules/permissions/system_meta.model';
 
-export async function seedSystemMeta(session: ClientSession): Promise<void> {
+export async function seedSystemMeta(_session: ClientSession): Promise<void> {
   // TODO: Member 4 — implement
   // 1. Drop existing system_meta document (upsert approach)
   // 2. Compute seedManifestHash from all seed data

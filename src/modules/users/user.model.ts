@@ -16,7 +16,8 @@
  *   - Write concern: default majority (never override)
  */
 
-import { Schema, model, Document, Types } from 'mongoose';
+import { Schema, model } from 'mongoose';
+// TODO: Member 4 — add Document, Types back when defining schema fields (Mongoose requires Document for typed models)
 import { IUser } from '@/types';
 
 // TODO: Member 4 — expand this schema with all fields from IUser
