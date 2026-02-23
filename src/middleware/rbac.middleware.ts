@@ -4,13 +4,32 @@ import { container } from '@/container';
 import ApiError from '@utils/ApiError';
 import { PermissionAction } from '@/types';
 
+const PERMISSIONS: Record<string, RoleName[]> = {
+  // ── Stations ───────────────────────────────────────────────────────────────
+  'stations:create':      ['user', 'moderator', 'admin'],
+  'stations:update':      ['user', 'moderator', 'admin'],  
+  'stations:approve':     ['moderator', 'admin'],
+  'stations:reject':      ['moderator', 'admin'],
+  'stations:viewPending': ['moderator', 'admin'],
+  'stations:delete':      ['admin'],
+  'stations:feature':     ['moderator', 'admin'],
+  'stations:viewStats':   ['user', 'moderator', 'admin'],
+
+  // ── Reviews ────────────────────────────────────────────────────────────────
+  'reviews:create':   ['user', 'moderator', 'admin'],
+  'reviews:moderate': ['moderator', 'admin'],
+
+  // ── Users ──────────────────────────────────────────────────────────────────
+  'users:manage': ['admin'],
+};
+
 /**
  * checkPermission — RBAC + PBAC middleware factory.
- * Uses PermissionEngine.evaluate() to check role permissions and All attached policies.
+ * Uses PermissionEngine.evaluate() to check role permissions and all attached policies.
  *
- * @param action — e.g. 'stations.create', 'reviews.moderate'
+ * @param action — e.g. 'stations:approve', 'reviews:moderate'
  *
- * Usage: router.post('/', protect, checkPermission('stations.create'), validate(...), controller)
+ * Usage: router.post('/', protect, checkPermission('stations:create'), validate(...), controller)
  */
 export const checkPermission =
   (action: PermissionAction) =>

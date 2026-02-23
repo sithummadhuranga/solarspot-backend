@@ -3,8 +3,6 @@ import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cors from 'cors';
-// express-mongo-sanitize and hpp both reassign req.query which is a
-// read-only getter in Express 5 — replaced with inline implementations below.
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
@@ -66,9 +64,6 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-// ─── HTTP Parameter Pollution prevention (Express-5-compatible) ──────────────
-// hpp also reassigns req.query — same Express 5 issue. We deduplicate array
-// params in-place: keep only the LAST value when a key appears more than once.
 app.use((req: Request, _res: Response, next: NextFunction) => {
   const q = req.query as Record<string, unknown>;
   for (const key of Object.keys(q)) {
@@ -122,14 +117,15 @@ if (config.NODE_ENV !== 'production') {
 import authRouter        from '@modules/auth/auth.routes';
 import usersRouter       from '@modules/users/user.routes';
 import permissionsRouter from '@modules/permissions/permission.routes';
-// import stationsRouter from '@modules/stations/station.routes';  // Member 1
-// import reviewsRouter  from '@modules/reviews/review.routes';    // Member 2
-import weatherRouter  from '@modules/weather/weather.routes';
+import stationsRouter    from '@modules/stations/station.routes';
+// import reviewsRouter from '@modules/reviews/review.routes';    // Member 2
+import weatherRouter     from '@modules/weather/weather.routes';
 
-app.use('/api/auth',    authRouter);
-app.use('/api/users',   usersRouter);
-app.use('/api/weather', weatherRouter);
-app.use('/api',         permissionsRouter); // routes define their own /admin/* paths
+app.use('/api/auth',        authRouter);
+app.use('/api/users',       usersRouter);
+app.use('/api/stations',    stationsRouter);
+app.use('/api/weather',     weatherRouter);
+app.use('/api',             permissionsRouter); // routes define their own /admin/* paths
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

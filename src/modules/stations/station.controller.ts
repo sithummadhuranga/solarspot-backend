@@ -1,97 +1,136 @@
-/**
- * Station controller — thin HTTP layer.
- *
- * TODO: Member 1 — uncomment service calls when StationService is implemented.
- *
- * Ref: PROJECT_OVERVIEW.md → API Endpoints → Stations (11 endpoints)
- */
-
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import asyncHandler from '@middleware/asyncHandler';
-import ApiResponse  from '@utils/ApiResponse';
-import type { AuthRequest } from '@/types';
-// import StationService from './station.service';
+import ApiResponse from '@utils/ApiResponse';
+import * as stationService from './station.service';
 
-/** POST /stations */
-export const createStation = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const station = await StationService.createStation(req.user!._id.toString(), req.body);
-  // res.status(201).json(ApiResponse.success(station, 'Station created'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'createStation: not yet implemented'));
+export const listStations = asyncHandler(async (req: Request, res: Response) => {
+  const {
+    page = 1,
+    limit = 10,
+    search,
+    lat,
+    lng,
+    radius,
+    connectorType,
+    minRating,
+    isVerified,
+    amenities,
+    sortBy,
+  } = req.query as Record<string, string | undefined>;
+
+  const { stations, pagination } = await stationService.listStations({
+    page: Number(page),
+    limit: Number(limit),
+    search: search as string | undefined,
+    lat: lat !== undefined ? Number(lat) : undefined,
+    lng: lng !== undefined ? Number(lng) : undefined,
+    radius: radius !== undefined ? Number(radius) : undefined,
+    connectorType: connectorType as string | undefined,
+    minRating: minRating !== undefined ? Number(minRating) : undefined,
+    isVerified:
+      isVerified !== undefined ? isVerified === 'true' : undefined,
+    amenities: amenities as string | string[] | undefined,
+    sortBy: sortBy as stationService.ListStationsOptions['sortBy'],
+  });
+
+  return ApiResponse.paginated(res, stations, pagination, 'Stations retrieved successfully');
 });
 
-/** GET /stations */
-export const listStations = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const result = await StationService.listStations(req.query as any);
-  // res.status(200).json(ApiResponse.success(result, 'Stations fetched'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'listStations: not yet implemented'));
+export const getNearbyStations = asyncHandler(async (req: Request, res: Response) => {
+  const { lat, lng, radius = '10', limit = '20' } = req.query as Record<string, string>;
+
+  const stations = await stationService.getNearbyStations({
+    lat: Number(lat),
+    lng: Number(lng),
+    radius: Number(radius),
+    limit: Number(limit),
+  });
+
+  return ApiResponse.success(res, stations, 'Nearby stations retrieved successfully');
 });
 
-/** GET /stations/nearby */
-export const getNearbyStations = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const stations = await StationService.getNearbyStations(req.query as any);
-  // res.status(200).json(ApiResponse.success(stations, 'Nearby stations'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getNearbyStations: not yet implemented'));
+export const searchStations = asyncHandler(async (req: Request, res: Response) => {
+  const { q, page = '1', limit = '10', sortBy = 'newest' } = req.query as Record<string, string>;
+
+  const { stations, pagination } = await stationService.listStations({
+    page: Number(page),
+    limit: Number(limit),
+    search: q,
+    sortBy: sortBy as stationService.ListStationsOptions['sortBy'],
+  });
+
+  return ApiResponse.paginated(res, stations, pagination, 'Stations retrieved successfully');
 });
 
-/** GET /stations/:id */
-export const getStationById = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const station = await StationService.getStationById(req.params.id);
-  // res.status(200).json(ApiResponse.success(station, 'Station fetched'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getStationById: not yet implemented'));
+export const getPendingStations = asyncHandler(async (req: Request, res: Response) => {
+  const { page = '1', limit = '10' } = req.query as Record<string, string>;
+
+  const { stations, pagination } = await stationService.getPendingStations(
+    Number(page),
+    Number(limit)
+  );
+
+  return ApiResponse.paginated(res, stations, pagination, 'Pending stations retrieved successfully');
 });
 
-/** PATCH /stations/:id */
-export const updateStation = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const station = await StationService.updateStation(req.params.id, req.user!._id.toString(), req.body);
-  // res.status(200).json(ApiResponse.success(station, 'Station updated'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'updateStation: not yet implemented'));
+export const getStationById = asyncHandler(async (req: Request, res: Response) => {
+  const station = await stationService.getStationById(req.params.id as string);
+  return ApiResponse.success(res, station, 'Station retrieved successfully');
 });
 
-/** DELETE /stations/:id */
-export const deleteStation = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // await StationService.deleteStation(req.params.id, req.user!._id.toString());
-  // res.status(204).send();
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'deleteStation: not yet implemented'));
+export const createStation = asyncHandler(async (req: Request, res: Response) => {
+  const station = await stationService.createStation({
+    ...req.body as Record<string, unknown>,
+    submittedBy: req.user!._id,
+  } as stationService.CreateStationInput);
+
+  return ApiResponse.created(res, station, 'Station submitted successfully and is pending review');
 });
 
-/** PATCH /admin/stations/:id/approve */
-export const approveStation = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const station = await StationService.approveStation(req.params.id);
-  // res.status(200).json(ApiResponse.success(station, 'Station approved'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'approveStation: not yet implemented'));
+export const updateStation = asyncHandler(async (req: Request, res: Response) => {
+  const station = await stationService.updateStation(
+    req.params.id as string,
+    req.body as stationService.UpdateStationInput,
+    req.user!._id
+  );
+
+  return ApiResponse.success(res, station, 'Station updated successfully');
 });
 
-/** PATCH /admin/stations/:id/reject */
-export const rejectStation = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const station = await StationService.rejectStation(req.params.id, req.body.reason);
-  // res.status(200).json(ApiResponse.success(station, 'Station rejected'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'rejectStation: not yet implemented'));
+export const featureStation = asyncHandler(async (req: Request, res: Response) => {
+  const station = await stationService.featureStation(
+    req.params.id as string,
+    req.user!._id
+  );
+  const message = (station as { isFeatured: boolean }).isFeatured
+    ? 'Station has been featured'
+    : 'Station has been unfeatured';
+  return ApiResponse.success(res, station, message);
 });
 
-/** GET /admin/stations */
-export const adminListStations = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1
-  // const result = await StationService.adminListStations(req.query as any);
-  // res.status(200).json(ApiResponse.success(result, 'Stations fetched'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'adminListStations: not yet implemented'));
+export const getStationStats = asyncHandler(async (req: Request, res: Response) => {
+  const stats = await stationService.getStationStats(req.params.id as string);
+  return ApiResponse.success(res, stats, 'Station statistics retrieved successfully');
 });
 
-/** GET /stations/:id/weather — Member 3 coordinates from WeatherService */
-export const getStationWeather = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1 — wire to WeatherService (Member 3 implements)
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getStationWeather: pending Member 3'));
+export const approveStation = asyncHandler(async (req: Request, res: Response) => {
+  const station = await stationService.approveStation(req.params.id as string, req.user!._id);
+  return ApiResponse.success(res, station, 'Station approved and is now active');
 });
 
-/** GET /stations/:id/best-times — Member 3 coordinates from WeatherService */
-export const getStationBestTimes = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 1 — wire to WeatherService (Member 3 implements)
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getStationBestTimes: pending Member 3'));
+export const rejectStation = asyncHandler(async (req: Request, res: Response) => {
+  const { rejectionReason } = req.body as { rejectionReason: string };
+
+  const station = await stationService.rejectStation(
+    req.params.id as string,
+    rejectionReason,
+    req.user!._id
+  );
+
+  return ApiResponse.success(res, station, 'Station rejected');
+});
+
+export const deleteStation = asyncHandler(async (req: Request, res: Response) => {
+  await stationService.deleteStation(req.params.id as string, req.user!._id);
+  return ApiResponse.noContent(res);
 });
