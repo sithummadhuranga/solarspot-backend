@@ -7,6 +7,30 @@ interface GeoResult {
 }
 
 /**
+ * IGeocoder — DI interface consumed by container.ts.
+ * Ref: MASTER_PROMPT.md → Dependency Inversion — depend on abstractions
+ */
+export interface IGeocoder {
+  forward(address: string): Promise<GeoResult | null>;
+  reverse(lat: number, lng: number): Promise<GeoResult | null>;
+}
+
+/**
+ * NominatimGeocoder — concrete implementation using OpenStreetMap Nominatim.
+ * TODO: Member 1 — implement forward() and reverse() fully.
+ * Ref: PROJECT_OVERVIEW.md → Third-Party Services → Nominatim (free, no API key)
+ */
+export class NominatimGeocoder implements IGeocoder {
+  async forward(address: string): Promise<GeoResult | null> {
+    return forwardGeocode(address);
+  }
+
+  async reverse(lat: number, lng: number): Promise<GeoResult | null> {
+    return reverseGeocode(lat, lng);
+  }
+}
+
+/**
  * forwardGeocode — converts a human-readable address to coordinates.
  * Uses the free OpenStreetMap Nominatim API (no API key required).
  * TODO: implement full response parsing and error handling

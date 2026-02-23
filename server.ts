@@ -16,7 +16,7 @@ import logger from '@utils/logger';
 const REQUIRED_VARS: (keyof typeof config)[] = [
   'MONGODB_URI',
   'JWT_SECRET',
-  'JWT_REFRESH_SECRET',
+  // JWT_REFRESH_EXPIRES is validated by Joi schema in env.ts, no separate refresh secret needed.
 ];
 
 const missing = REQUIRED_VARS.filter((key) => !config[key]);

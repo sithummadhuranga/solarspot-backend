@@ -1,8 +1,9 @@
 * @member4
-/src/modules/stations/   @member1
-/src/modules/reviews/    @member2
-/src/modules/weather/    @member3
-/src/modules/auth/       @member4
-/src/modules/users/      @member4
-/Dockerfile              @member1
-/docker-compose.yml      @member1
+/src/modules/stations/    @member1
+/src/modules/reviews/     @member2
+/src/modules/weather/     @member3
+/src/modules/auth/        @member4
+/src/modules/users/       @member4
+/src/modules/permissions/ @member4
+/Dockerfile               @member3
+/docker-compose.yml       @member3

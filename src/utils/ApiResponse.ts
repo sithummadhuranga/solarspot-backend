@@ -49,6 +49,22 @@ class ApiResponse {
       timestamp: new Date().toISOString(),
     });
   }
+
+  /**
+   * error — returns a plain error envelope object (does NOT send the response).
+   * Usage: res.status(4xx).json(ApiResponse.error('CODE', 'message'))
+   */
+  static error(
+    code: string,
+    message: string
+  ): { success: false; code: string; message: string; timestamp: string } {
+    return {
+      success: false,
+      code,
+      message,
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
 
 export default ApiResponse;

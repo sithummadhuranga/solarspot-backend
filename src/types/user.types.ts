@@ -1,0 +1,73 @@
+/**
+ * User & Auth TypeScript interfaces.
+ * Owner: Member 4 — expand fields when implementing the model.
+ * Ref: PROJECT_OVERVIEW.md → Database → users collection
+ */
+
+import { Document, Types } from 'mongoose';
+
+// ─── Role slugs ─────────────────────────────────────────────────────────────
+// Ref: PROJECT_OVERVIEW.md → Roles — 10 Total
+export type RoleSlug =
+  | 'guest'
+  | 'user'
+  | 'station_owner'
+  | 'featured_contributor'
+  | 'trusted_reviewer'
+  | 'review_moderator'
+  | 'weather_analyst'
+  | 'permission_auditor'
+  | 'moderator'
+  | 'admin';
+
+// ─── User document ──────────────────────────────────────────────────────────
+// TODO: Member 4 — add all fields here when implementing user.model.ts
+export interface IUser extends Document {
+  _id: Types.ObjectId;
+  displayName: string;
+  email: string;
+  password: string;             // select: false
+  role: Types.ObjectId | IRole; // ref: 'Role'
+  isActive: boolean;
+  isEmailVerified: boolean;
+  isBanned: boolean;
+  emailVerifyToken?: string;    // select: false, sparse index
+  passwordResetToken?: string;  // select: false, sparse index
+  refreshToken?: string;        // select: false, sparse index
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Role document ──────────────────────────────────────────────────────────
+export interface IRole extends Document {
+  _id: Types.ObjectId;
+  name: RoleSlug;
+  displayName: string;
+  roleLevel: number;   // 0–4
+  isSystem: boolean;   // system roles cannot be deleted
+  isActive: boolean;
+}
+
+// ─── DTOs ───────────────────────────────────────────────────────────────────
+export interface CreateUserInput {
+  displayName: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface UpdateProfileInput {
+  displayName?: string;
+  // TODO: Member 4 — add additional updatable fields
+}
+
+export interface AdminUpdateUserInput {
+  role?: string;
+  isActive?: boolean;
+  isBanned?: boolean;
+  // TODO: Member 4 — add additional admin-updatable fields
+}

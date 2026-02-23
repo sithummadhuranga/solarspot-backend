@@ -20,9 +20,11 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
       "@config/*": ["src/config/*"],
       "@middleware/*": ["src/middleware/*"],
       "@modules/*": ["src/modules/*"],
+      "@services/*": ["src/services/*"],
       "@utils/*": ["src/utils/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"]

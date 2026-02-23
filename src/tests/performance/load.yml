@@ -1,0 +1,62 @@
+# Artillery performance test — SolarSpot API
+# TODO: All members — expand scenarios and thresholds per module.
+# Run: npx artillery run src/tests/performance/load.yml
+# Ref: MASTER_PROMPT.md → Performance Testing → Artillery YAML
+# Targets: p95 < 200ms, error rate < 1%
+
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: Warm-up
+    - duration: 120
+      arrivalRate: 50
+      name: Sustained load
+    - duration: 30
+      arrivalRate: 100
+      name: Peak spike
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+  # TODO: Member 4 — set Authorization header with test JWT for authenticated scenarios
+  # variables:
+  #   ACCESS_TOKEN: "Bearer <test_jwt>"
+
+scenarios:
+  # ── Public endpoints ──────────────────────────────────────────────────────
+  - name: "List stations"
+    flow:
+      - get:
+          url: "/api/stations"
+
+  - name: "Get nearby stations"
+    flow:
+      - get:
+          url: "/api/stations/nearby?lat=6.9271&lng=79.8612&radius=5000"
+
+  - name: "Get station weather"
+    flow:
+      - get:
+          # TODO: replace with a real seeded stationId
+          url: "/api/stations/{{STATION_ID}}/weather"
+
+  - name: "Solar heatmap"
+    flow:
+      - get:
+          url: "/api/weather/heatmap"
+
+  # ── Auth ─────────────────────────────────────────────────────────────────
+  - name: "Login"
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "admin@solarspot.dev"
+            password: "Admin@123456"
+
+ensure:
+  p95: 200
+  maxErrorRate: 1
