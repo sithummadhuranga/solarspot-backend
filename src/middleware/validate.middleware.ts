@@ -14,8 +14,7 @@ type ValidatePart = 'body' | 'params' | 'query';
 export const validate =
   (schema: Joi.ObjectSchema, part: ValidatePart = 'body') =>
   (req: Request, _res: Response, next: NextFunction): void => {
-    // TODO: validate req[part] against schema
-    const { error } = schema.validate(req[part], { abortEarly: false });
+    const { error, value } = schema.validate(req[part], { abortEarly: false });
 
     if (error) {
       const errors = error.details.map((d) => d.message);
@@ -23,5 +22,7 @@ export const validate =
       return;
     }
 
+    // Write validated + stripped + defaulted value back so downstream sees clean data
+    (req as unknown as Record<string, unknown>)[part] = value;
     next();
   };

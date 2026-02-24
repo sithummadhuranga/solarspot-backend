@@ -10,12 +10,11 @@
  * ⚠️  DEV ONLY — never run seed:demo in production (demo:reset clears the DB first)
  */
 
+import bcrypt from 'bcryptjs';
 import { ClientSession } from 'mongoose';
+import { User } from '@modules/users/user.model';
+import { Role } from '@modules/permissions/role.model';
 import logger from '@utils/logger';
-
-// TODO: Member 4 — import models when implemented
-// import { User } from '@modules/users/user.model';
-// import { Role } from '@modules/permissions/role.model';
 
 // ─── Demo credentials ────────────────────────────────────────────────────────
 // Ref: PROJECT_OVERVIEW.md → Demo Credentials
@@ -27,10 +26,33 @@ export const DEMO_USERS = [
   { email: 'unverified@solarspot.app',  password: 'User@2026!',   role: 'user',          displayName: 'Unverified User',isEmailVerified: false },
 ];
 
-export async function seedDemoUsers(_session: ClientSession): Promise<void> {
-  // TODO: Member 4 — implement
-  // 1. For each demo user, resolve the role ObjectId from ROLES_SEED
-  // 2. Hash passwords with bcrypt (rounds: 12)
-  // 3. Upsert by email — idempotent
-  logger.warn('seedDemoUsers: not yet implemented');
+export async function seedDemoUsers(session: ClientSession): Promise<void> {
+  const roles = await Role.find().lean();
+  const roleMap = new Map(roles.map(r => [r.name as string, r._id]));
+
+  const SALT_ROUNDS = 12;
+
+  for (const demo of DEMO_USERS) {
+    const roleId = roleMap.get(demo.role);
+    if (!roleId) {
+      logger.warn(`⚠️  seedDemoUsers: role "${demo.role}" not found — skipping ${demo.email}`);
+      continue;
+    }
+    const hashedPassword = await bcrypt.hash(demo.password, SALT_ROUNDS);
+    await User.findOneAndUpdate(
+      { email: demo.email },
+      {
+        $set: {
+          displayName:     demo.displayName,
+          email:           demo.email,
+          password:        hashedPassword,
+          role:            roleId,
+          isEmailVerified: demo.isEmailVerified,
+          isActive:        true,
+        },
+      },
+      { upsert: true, new: true, session },
+    );
+  }
+  logger.info(`✅  demo users seeded (${DEMO_USERS.length})`);
 }

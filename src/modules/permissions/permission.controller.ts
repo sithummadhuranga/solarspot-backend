@@ -1,72 +1,227 @@
 /**
  * Permission controller — thin HTTP layer for RBAC/ABAC management.
  *
- * TODO: Member 4 — uncomment service calls when PermissionService is implemented.
- *
  * Ref: PROJECT_OVERVIEW.md → API Endpoints → Permissions (17 endpoints)
+ *      MASTER_PROMPT.md → Controllers Must Be Thin — no business logic here
  */
 
 import { Response } from 'express';
 import asyncHandler from '@middleware/asyncHandler';
 import ApiResponse  from '@utils/ApiResponse';
 import type { AuthRequest } from '@/types';
-// import PermissionService from './permission.service';
+import PermissionService from './permission.service';
 
+/**
+ * @swagger
+ * /admin/permissions:
+ *   get:
+ *     summary: List all 35 permission actions
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.read
+ *     responses:
+ *       200:
+ *         description: Permission list
+ */
 export const listPermissions = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // const permissions = await PermissionService.listPermissions();
-  // res.status(200).json(ApiResponse.success(permissions, 'Permissions fetched'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'listPermissions: not yet implemented'));
+  const data = await PermissionService.listPermissions();
+  return ApiResponse.success(res, data, 'Permissions fetched');
 });
 
+/**
+ * @swagger
+ * /admin/roles:
+ *   get:
+ *     summary: List all 10 roles
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.read
+ *     responses:
+ *       200:
+ *         description: Roles list
+ */
 export const listRoles = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'listRoles: not yet implemented'));
+  const data = await PermissionService.listRoles();
+  return ApiResponse.success(res, data, 'Roles fetched');
 });
 
-export const getRolePermissions = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getRolePermissions: not yet implemented'));
+/**
+ * @swagger
+ * /admin/roles/{id}/permissions:
+ *   get:
+ *     summary: Get permissions assigned to a role
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.read
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Role permissions
+ */
+export const getRolePermissions = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const data = await PermissionService.getRolePermissions(String(req.params.id));
+  return ApiResponse.success(res, data, 'Role permissions fetched');
 });
 
-export const assignPermissionToRole = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'assignPermissionToRole: not yet implemented'));
+/**
+ * @swagger
+ * /admin/roles/{id}/permissions:
+ *   post:
+ *     summary: Assign a permission (+ policies) to a role
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.manage
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       201:
+ *         description: Permission assigned
+ */
+export const assignPermissionToRole = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { permissionId, policyIds } = req.body;
+  const data = await PermissionService.assignPermissionToRole(String(req.params.id), permissionId, policyIds);
+  return ApiResponse.created(res, data, 'Permission assigned to role');
 });
 
-export const removePermissionFromRole = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'removePermissionFromRole: not yet implemented'));
+/**
+ * @swagger
+ * /admin/roles/{id}/permissions/{permId}:
+ *   delete:
+ *     summary: Remove a permission from a role
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.manage
+ *     responses:
+ *       204:
+ *         description: Permission removed
+ */
+export const removePermissionFromRole = asyncHandler(async (req: AuthRequest, res: Response) => {
+  await PermissionService.removePermissionFromRole(String(req.params.id), String(req.params.permId));
+  return ApiResponse.noContent(res);
 });
 
-export const getUserEffectivePermissions = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getUserEffectivePermissions: not yet implemented'));
+/**
+ * @swagger
+ * /admin/users/{id}/permissions:
+ *   get:
+ *     summary: Get effective permissions for a user
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.read
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Effective permissions
+ */
+export const getUserEffectivePermissions = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const data = await PermissionService.getUserEffectivePermissions(String(req.params.id));
+  return ApiResponse.success(res, data, 'Effective permissions fetched');
 });
 
-export const overrideUserPermission = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'overrideUserPermission: not yet implemented'));
+/**
+ * @swagger
+ * /admin/users/{id}/permissions:
+ *   post:
+ *     summary: Override a permission for a user
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.manage
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       201:
+ *         description: Override created / updated
+ */
+export const overrideUserPermission = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { permissionId, effect, reason, expiresAt } = req.body;
+  const data = await PermissionService.overrideUserPermission(
+    String(req.params.id), permissionId, effect, req.user!._id.toString(), reason, expiresAt,
+  );
+  return ApiResponse.created(res, data, 'Permission override saved');
 });
 
-export const removeUserPermissionOverride = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'removeUserPermissionOverride: not yet implemented'));
+/**
+ * @swagger
+ * /admin/users/{id}/permissions/{permId}:
+ *   delete:
+ *     summary: Remove a user permission override
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.manage
+ *     responses:
+ *       204:
+ *         description: Override removed
+ */
+export const removeUserPermissionOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
+  await PermissionService.removeUserPermissionOverride(String(req.params.id), String(req.params.permId), req.user!._id.toString());
+  return ApiResponse.noContent(res);
 });
 
-export const checkPermission = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // const result = await PermissionService.checkPermission(req.user!._id.toString(), req.body.action, req.body.context);
-  // res.status(200).json(ApiResponse.success(result, 'Permission evaluated'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'checkPermission: not yet implemented'));
+/**
+ * @swagger
+ * /permissions/check:
+ *   post:
+ *     summary: Check if the current user has a given permission (frontend use)
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Evaluation result
+ */
+export const checkPermission = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { action, context } = req.body;
+  const result = await PermissionService.checkAccess(req.user!._id.toString(), action, context);
+  return ApiResponse.success(res, result, 'Permission evaluated');
 });
 
-export const listAuditLogs = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'listAuditLogs: not yet implemented'));
+/**
+ * @swagger
+ * /admin/audit-logs:
+ *   get:
+ *     summary: Paginated audit trail
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: audit.read
+ *     responses:
+ *       200:
+ *         description: Audit logs
+ */
+export const listAuditLogs = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const result = await PermissionService.listAuditLogs(req.query as Record<string, unknown>);
+  return ApiResponse.paginated(
+    res,
+    result.data,
+    { page: result.page, limit: result.limit, total: result.total, totalPages: result.pages, hasNext: result.page < result.pages, hasPrev: result.page > 1 },
+  );
 });
 
+/**
+ * @swagger
+ * /admin/quota:
+ *   get:
+ *     summary: Third-party API quota stats
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: quotas.read
+ *     responses:
+ *       200:
+ *         description: Quota statistics
+ */
 export const getQuotaStats = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getQuotaStats: not yet implemented'));
+  const data = await PermissionService.getQuotaStats();
+  return ApiResponse.success(res, data, 'Quota stats fetched');
 });

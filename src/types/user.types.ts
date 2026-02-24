@@ -21,7 +21,6 @@ export type RoleSlug =
   | 'admin';
 
 // ─── User document ──────────────────────────────────────────────────────────
-// TODO: Member 4 — add all fields here when implementing user.model.ts
 export interface IUser extends Document {
   _id: Types.ObjectId;
   displayName: string;
@@ -32,10 +31,17 @@ export interface IUser extends Document {
   isEmailVerified: boolean;
   isBanned: boolean;
   emailVerifyToken?: string;    // select: false, sparse index
+  emailVerifyExpires?: Date;    // select: false
   passwordResetToken?: string;  // select: false, sparse index
+  passwordResetExpires?: Date;  // select: false
   refreshToken?: string;        // select: false, sparse index
+  deletedAt?: Date;
+  deletedBy?: Types.ObjectId;   // ref: 'User'
   createdAt: Date;
   updatedAt: Date;
+  
+  // Methods
+  comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 // ─── Role document ──────────────────────────────────────────────────────────

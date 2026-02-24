@@ -11,10 +11,8 @@
 
 import { ClientSession } from 'mongoose';
 import { PermissionAction } from '@/types';
+import { Permission } from '@modules/permissions/permission.model';
 import logger from '@utils/logger';
-
-// TODO: Member 4 — import Permission model when implemented
-// import { Permission } from '@modules/permissions/permission.model';
 
 interface PermissionSeed {
   action: PermissionAction;
@@ -68,8 +66,14 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
   { action: 'notifications.read-own',  resource: 'notifications', component: 'permissions', description: 'Read own notifications' },
 ];
 
-export async function seedPermissions(_session: ClientSession): Promise<void> {
-  // TODO: Member 4 — upsert all 35 permissions using PERMISSIONS_SEED above
-  // Use { action } as the filter key for upsert (idempotent re-runs)
-  logger.warn('seedPermissions: not yet implemented');
+export async function seedPermissions(session: ClientSession): Promise<void> {
+  const ops = PERMISSIONS_SEED.map(p => ({
+    updateOne: {
+      filter: { action: p.action },
+      update: { $set: p },
+      upsert: true,
+    },
+  }));
+  await Permission.bulkWrite(ops, { session } as Parameters<typeof Permission.bulkWrite>[1]);
+  logger.info(`✅  permissions seeded (${PERMISSIONS_SEED.length})`);
 }

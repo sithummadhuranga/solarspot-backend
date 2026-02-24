@@ -99,45 +99,99 @@ export class EmailService {
   // OCP: add a new template = add one method here + one HTML file in /templates
 
   /** Triggered: POST /api/auth/register */
-  async sendVerifyEmail(_user: IUserForEmail, _verifyUrl: string): Promise<void> {
-    // TODO: Member 4 — implement
-    logger.warn('EmailService.sendVerifyEmail: not yet implemented');
+  async sendVerifyEmail(user: IUserForEmail, verifyUrl: string): Promise<void> {
+    await this.send(
+      user.email,
+      `Verify your email — ${config.APP_NAME}`,
+      'verify-email',
+      {
+        USER_NAME: user.displayName,
+        VERIFY_URL: verifyUrl,
+      },
+    );
   }
 
   /** Triggered: POST /api/auth/forgot-password */
-  async sendPasswordReset(_user: IUserForEmail, _resetUrl: string): Promise<void> {
-    // TODO: Member 4 — implement
-    logger.warn('EmailService.sendPasswordReset: not yet implemented');
+  async sendPasswordReset(user: IUserForEmail, resetUrl: string): Promise<void> {
+    await this.send(
+      user.email,
+      `Reset your password — ${config.APP_NAME}`,
+      'reset-password',
+      {
+        USER_NAME: user.displayName,
+        RESET_URL: resetUrl,
+      },
+    );
   }
 
   /** Triggered: GET /api/auth/verify-email/:token (after successful verification) */
-  async sendWelcome(_user: IUserForEmail): Promise<void> {
-    // TODO: Member 4 — implement
-    logger.warn('EmailService.sendWelcome: not yet implemented');
+  async sendWelcome(user: IUserForEmail): Promise<void> {
+    await this.send(
+      user.email,
+      `Welcome to ${config.APP_NAME}!`,
+      'welcome',
+      {
+        USER_NAME: user.displayName,
+        MAP_URL: `${config.APP_URL}/map`,
+      },
+    );
   }
 
   /** Triggered: PATCH /api/stations/:id/approve */
-  async sendStationApproved(_user: IUserForEmail, _stationName: string, _stationUrl: string): Promise<void> {
-    // TODO: Member 4 — implement
-    logger.warn('EmailService.sendStationApproved: not yet implemented');
+  async sendStationApproved(user: IUserForEmail, stationName: string, stationUrl: string): Promise<void> {
+    await this.send(
+      user.email,
+      `Your station has been approved — ${config.APP_NAME}`,
+      'station-approved',
+      {
+        USER_NAME: user.displayName,
+        STATION_NAME: stationName,
+        STATION_URL: stationUrl,
+      },
+    );
   }
 
   /** Triggered: PATCH /api/stations/:id/reject */
-  async sendStationRejected(_user: IUserForEmail, _stationName: string, _reason: string): Promise<void> {
-    // TODO: Member 4 — implement
-    logger.warn('EmailService.sendStationRejected: not yet implemented');
+  async sendStationRejected(user: IUserForEmail, stationName: string, reason: string): Promise<void> {
+    await this.send(
+      user.email,
+      `Your station submission needs revision — ${config.APP_NAME}`,
+      'station-rejected',
+      {
+        USER_NAME: user.displayName,
+        STATION_NAME: stationName,
+        REJECTION_REASON: reason,
+      },
+    );
   }
 
   /** Triggered: QuotaService when 80% threshold is hit */
-  async sendQuotaAlert(_adminEmail: string, _serviceName: string, _percentage: number, _todayCount: number): Promise<void> {
-    // TODO: Member 4 — implement
-    logger.warn('EmailService.sendQuotaAlert: not yet implemented');
+  async sendQuotaAlert(adminEmail: string, serviceName: string, percentage: number, todayCount: number): Promise<void> {
+    await this.send(
+      adminEmail,
+      `⚠️ Quota Alert: ${serviceName} at ${percentage}% — ${config.APP_NAME}`,
+      'quota-alert',
+      {
+        SERVICE_NAME: serviceName,
+        PERCENTAGE: String(percentage),
+        TODAY_COUNT: String(todayCount),
+      },
+    );
   }
 
   /** Triggered: POST /api/permissions/users/:id/overrides */
-  async sendPermissionChange(_user: IUserForEmail, _changedBy: IUserForEmail, _changeDescription: string, _effect: 'grant' | 'deny'): Promise<void> {
-    // TODO: Member 4 — implement
-    logger.warn('EmailService.sendPermissionChange: not yet implemented');
+  async sendPermissionChange(user: IUserForEmail, changedBy: IUserForEmail, changeDescription: string, effect: 'grant' | 'deny'): Promise<void> {
+    await this.send(
+      user.email,
+      `Your permissions have been updated — ${config.APP_NAME}`,
+      'permission-change',
+      {
+        USER_NAME: user.displayName,
+        CHANGED_BY: changedBy.displayName,
+        CHANGE_DESCRIPTION: changeDescription,
+        EFFECT: effect.toUpperCase(),
+      },
+    );
   }
 }
 

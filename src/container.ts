@@ -17,7 +17,7 @@
  */
 
 import EmailService  from '@services/email.service';
-import QuotaService  from '@services/quota.service';
+import QuotaService, { MongoQuotaStore }  from '@services/quota.service';
 import PermissionEngine from '@services/permission.engine';
 import { NominatimGeocoder } from '@utils/geocoder';
 
@@ -37,9 +37,7 @@ interface Container {
 function buildContainer(): Container {
   const emailService     = new EmailService();
   const quotaService     = new QuotaService(
-    // TODO: Member 4 — wire in the MongoDB-backed IQuotaStore implementation
-    // For now, QuotaService uses a no-op store (logs warnings)
-    { get: async () => null, increment: async () => 0, reset: async () => {} },
+    new MongoQuotaStore(),
     emailService,
     process.env.ADMIN_EMAIL,
   );

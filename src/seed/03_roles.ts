@@ -12,10 +12,8 @@
 
 import { ClientSession } from 'mongoose';
 import { RoleSlug } from '@/types';
+import { Role } from '@modules/permissions/role.model';
 import logger from '@utils/logger';
-
-// TODO: Member 4 — import Role model when implemented
-// import { Role } from '@modules/permissions/role.model';
 
 interface RoleSeed {
   name: RoleSlug;
@@ -39,8 +37,14 @@ export const ROLES_SEED: RoleSeed[] = [
   { name: 'admin',                displayName: 'Administrator',        roleLevel: 4, isSystem: true  },
 ];
 
-export async function seedRoles(_session: ClientSession): Promise<void> {
-  // TODO: Member 4 — upsert all 10 roles using ROLES_SEED above
-  // Use { name } as the filter key for upsert (idempotent re-runs)
-  logger.warn('seedRoles: not yet implemented');
+export async function seedRoles(session: ClientSession): Promise<void> {
+  const ops = ROLES_SEED.map(r => ({
+    updateOne: {
+      filter: { name: r.name },
+      update: { $set: r },
+      upsert: true,
+    },
+  }));
+  await Role.bulkWrite(ops, { session } as Parameters<typeof Role.bulkWrite>[1]);
+  logger.info(`✅  roles seeded (${ROLES_SEED.length})`);
 }

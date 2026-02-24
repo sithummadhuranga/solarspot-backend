@@ -1,8 +1,6 @@
 /**
  * User controller — thin HTTP layer, delegates to UserService.
  *
- * TODO: Member 4 — uncomment service calls when UserService methods are implemented.
- *
  * Ref: PROJECT_OVERVIEW.md → API Endpoints → Users (6 endpoints)
  *      MASTER_PROMPT.md → Controllers Must Be Thin — no business logic here
  */
@@ -11,52 +9,136 @@ import { Response } from 'express';
 import asyncHandler from '@middleware/asyncHandler';
 import ApiResponse  from '@utils/ApiResponse';
 import type { AuthRequest } from '@/types';
-// import UserService from './user.service';
+import UserService from './user.service';
 
-/** GET /users/me — own profile */
-export const getMe = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // const user = await UserService.getMe(req.user!._id.toString());
-  // res.status(200).json(ApiResponse.success(user, 'Profile fetched'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getMe: not yet implemented'));
+/**
+ * @swagger
+ * /users/me:
+ *   get:
+ *     summary: Get own profile
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: users.read-own
+ *     x-component: users
+ *     responses:
+ *       200:
+ *         description: Profile returned
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const user = await UserService.getMe(req.user!._id);
+  return ApiResponse.success(res, user, 'Profile fetched');
 });
 
-/** PATCH /users/me — update own profile */
-export const updateMe = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // const user = await UserService.updateMe(req.user!._id.toString(), req.body);
-  // res.status(200).json(ApiResponse.success(user, 'Profile updated'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'updateMe: not yet implemented'));
+/**
+ * @swagger
+ * /users/me:
+ *   put:
+ *     summary: Update own profile
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: users.edit-own
+ *     x-component: users
+ *     responses:
+ *       200:
+ *         description: Profile updated
+ */
+export const updateMe = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const user = await UserService.updateMe(req.user!._id, req.body);
+  return ApiResponse.success(res, user, 'Profile updated');
 });
 
-/** DELETE /users/me — soft-delete own account */
-export const deleteMe = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // await UserService.deleteMe(req.user!._id.toString());
-  // res.status(204).send();
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'deleteMe: not yet implemented'));
+/**
+ * @swagger
+ * /users/me:
+ *   delete:
+ *     summary: Soft-delete own account
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: users.edit-own
+ *     x-component: users
+ *     responses:
+ *       204:
+ *         description: Account deleted
+ */
+export const deleteMe = asyncHandler(async (req: AuthRequest, res: Response) => {
+  await UserService.deleteMe(req.user!._id);
+  res.clearCookie('refreshToken');
+  return ApiResponse.noContent(res);
 });
 
-/** GET /admin/users — paginated user list (admin) */
-export const listUsers = asyncHandler(async (req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // const result = await UserService.listUsers(req.query);
-  // res.status(200).json(ApiResponse.success(result, 'Users fetched'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'listUsers: not yet implemented'));
-});
-
-/** GET /admin/users/:id — get user by id (admin) */
+/**
+ * @swagger
+ * /users/{id}:
+ *   get:
+ *     summary: Get a public user profile by ID
+ *     tags: [Users]
+ *     x-permission: users.read-public
+ *     x-component: users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: User profile returned
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 export const getUserById = asyncHandler(async (req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // const user = await UserService.getUserById(req.params.id);
-  // res.status(200).json(ApiResponse.success(user, 'User fetched'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'getUserById: not yet implemented'));
+  const user = await UserService.getUserById(String(req.params.id));
+  return ApiResponse.success(res, user, 'User fetched');
 });
 
-/** PATCH /admin/users/:id — admin update (role/isActive) */
+/**
+ * @swagger
+ * /users:
+ *   get:
+ *     summary: List all users (admin)
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: users.read-list
+ *     x-min-role: 4
+ *     x-component: users
+ *     responses:
+ *       200:
+ *         description: Paginated user list
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+export const listUsers = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const result = await UserService.listUsers(req.query as Record<string, unknown>);
+  return ApiResponse.paginated(
+    res,
+    result.data,
+    { page: result.page, limit: result.limit, total: result.total, totalPages: result.pages, hasNext: result.page < result.pages, hasPrev: result.page > 1 },
+  );
+});
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   put:
+ *     summary: Admin update user (role, isActive, isBanned)
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: users.manage
+ *     x-min-role: 4
+ *     x-component: users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: User updated
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
 export const adminUpdateUser = asyncHandler(async (req: AuthRequest, res: Response) => {
-  // TODO: Member 4
-  // const user = await UserService.adminUpdateUser(req.params.id, req.body);
-  // res.status(200).json(ApiResponse.success(user, 'User updated'));
-  res.status(501).json(ApiResponse.error('NOT_IMPLEMENTED', 'adminUpdateUser: not yet implemented'));
+  const user = await UserService.adminUpdateUser(String(req.params.id), req.body, req.user!._id);
+  return ApiResponse.success(res, user, 'User updated');
 });
