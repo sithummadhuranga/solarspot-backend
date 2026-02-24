@@ -219,6 +219,21 @@ export async function adminChangeRole(
   };
 }
 
+export async function deleteMe(userId: string): Promise<{ message: string }> {
+  const user = await User.findById(userId).select('+refreshToken');
+  if (!user) throw new ApiError(404, 'User not found');
+
+  user.isActive = false;
+  user.email = `deleted_${userId}@deleted.solarspot`;
+  user.refreshToken = null;
+  user.deletedAt = new Date();
+  await user.save();
+
+  logger.info('User self-deleted account', { userId });
+
+  return { message: 'Your account has been deactivated' };
+}
+
 export async function adminSoftDeleteUser(
   adminId: string,
   targetUserId: string

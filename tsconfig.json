@@ -23,7 +23,8 @@
       "@config/*": ["src/config/*"],
       "@middleware/*": ["src/middleware/*"],
       "@modules/*": ["src/modules/*"],
-      "@utils/*": ["src/utils/*"]
+      "@utils/*": ["src/utils/*"],
+      "@services/*": ["src/services/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },

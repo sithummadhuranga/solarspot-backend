@@ -121,12 +121,16 @@ if (config.NODE_ENV !== 'production') {
 // ─── Module routes ─────────────────────────────────────────────────────────────
 import authRouter  from '@modules/users/auth.routes';
 import usersRouter from '@modules/users/user.routes';
+import permissionsRouter from '@modules/permissions/permissions.routes';
+import adminQuotaRouter from '@modules/permissions/admin-quota.routes';
 // import stationsRouter from '@modules/stations/station.routes';
 // import reviewsRouter  from '@modules/reviews/review.routes';
 // import weatherRouter  from '@modules/weather/weather.routes';
 
 app.use('/api/auth',  authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/permissions', permissionsRouter);
+app.use('/api/admin/quota', adminQuotaRouter);
 // app.use('/api/stations', stationsRouter);
 // app.use('/api/reviews',  reviewsRouter);
 // app.use('/api/weather',  weatherRouter);

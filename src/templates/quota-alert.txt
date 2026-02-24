@@ -1,0 +1,27 @@
+Quota Alert — SolarSpot Admin
+
+⚠️ Admin Alert: High API Usage
+
+The {{SERVICE_NAME}} service has reached {{PERCENTAGE}}% of its daily quota limit.
+
+Action Required: Monitor usage closely to prevent service degradation. Consider implementing additional caching or reducing feature usage.
+
+Service Stats:
+- Service: {{SERVICE_NAME}}
+- Usage Today: {{TODAY_COUNT}} / {{LIMIT}}
+- Percentage: {{PERCENTAGE}}%
+- Remaining: {{REMAINING}} calls
+
+What happens when quota is exceeded:
+• OpenWeatherMap: Returns cached data or null (no solar scores)
+• Perspective API: Skips toxicity check, flags for manual review
+• Brevo SMTP: Emails are logged but not sent (critical failure)
+
+View Quota Dashboard:
+{{APP_URL}}/admin/quotas
+
+This is an automated alert sent when a service crosses 80% of its daily limit. Alerts are sent once per threshold crossing per day.
+
+---
+© {{YEAR}} SolarSpot. All rights reserved.
+This email was sent to all admin users.

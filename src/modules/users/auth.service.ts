@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import User from '@modules/users/user.model';
 import ApiError from '@utils/ApiError';
-import * as emailService from '@utils/email.service';
+import emailService from '@utils/email.service';
 import { config } from '@config/env';
 import logger from '@utils/logger';
 

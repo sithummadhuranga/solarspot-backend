@@ -21,7 +21,7 @@ export const PERMISSIONS: Record<string, RoleName[]> = {
 
   'users:read:own':       ['user', 'moderator', 'admin'],
   'users:update:own':     ['user', 'moderator', 'admin'],
-  'users:manage':         ['admin'],
+  'users.manage':         ['admin'],
 
   'weather:cache:stats':  ['admin'],
 };

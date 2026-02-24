@@ -1,0 +1,24 @@
+Station Submission Update
+
+Hi {{DISPLAY_NAME}},
+
+Thank you for your station submission. After review by our moderation team, we're unable to approve your submission at this time.
+
+Station: {{STATION_NAME}}
+Reason: {{REJECTION_REASON}}
+
+Don't worry! You can update and resubmit your station with the necessary corrections.
+
+Common reasons for rejection:
+- Incomplete or inaccurate location information
+- Duplicate submission (station already exists)
+- Insufficient description or missing details
+- Station is not publicly accessible
+
+Review your submission: {{APP_URL}}/stations/my
+
+Questions? Contact: support@solarspot.app
+
+---
+© {{YEAR}} SolarSpot. All rights reserved.
+SE3040 Application Frameworks · SLIIT

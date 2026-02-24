@@ -1,0 +1,25 @@
+Permission Changed — SolarSpot
+
+Hi {{DISPLAY_NAME}},
+
+An administrator has modified your SolarSpot account permissions. Here are the details:
+
+Change Applied:
+{{CHANGE_DESCRIPTION}}
+
+Effect: {{EFFECT}}
+
+What this means:
+{{IMPACT_DESCRIPTION}}
+
+Changed by: {{CHANGED_BY_NAME}} (Admin)
+Reason: {{REASON}}
+
+If you believe this change was made in error or have questions about your new permissions, please contact an administrator.
+
+Go to SolarSpot:
+{{APP_URL}}
+
+---
+© {{YEAR}} SolarSpot. All rights reserved.
+This change was logged in the system audit trail.

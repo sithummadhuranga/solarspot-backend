@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quota Alert — SolarSpot Admin</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 32px; text-align: center; }
+    .header h1 { color: #fff; margin: 0; font-size: 26px; letter-spacing: -0.5px; }
+    .header p  { color: rgba(255,255,255,.85); margin: 6px 0 0; font-size: 14px; }
+    .body { padding: 32px; color: #333; line-height: 1.6; }
+    .body h2 { color: #1a1a1a; margin-top: 0; }
+    .btn { display: inline-block; margin: 24px 0; padding: 14px 32px; background: #ef4444; color: #fff !important; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 15px; }
+    .footer { background: #f9fafb; border-top: 1px solid #e5e7eb; padding: 20px 32px; font-size: 12px; color: #9ca3af; text-align: center; }
+    .alert { background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 14px; color: #991b1b; }
+    .stats { background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0; }
+    .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { font-weight: 600; color: #374151; }
+    .stat-value { font-weight: 700; color: #ef4444; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>⚠️ Quota Alert</h1>
+      <p>Third-party API usage threshold reached</p>
+    </div>
+    <div class="body">
+      <h2>Admin Alert: High API Usage</h2>
+      <p>The <strong>{{SERVICE_NAME}}</strong> service has reached <strong>{{PERCENTAGE}}%</strong> of its daily quota limit.</p>
+      
+      <div class="alert">
+        <strong>Action Required:</strong> Monitor usage closely to prevent service degradation. Consider implementing additional caching or reducing feature usage.
+      </div>
+      
+      <div class="stats">
+        <div class="stat-row">
+          <span class="stat-label">Service</span>
+          <span class="stat-value">{{SERVICE_NAME}}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Usage Today</span>
+          <span class="stat-value">{{TODAY_COUNT}} / {{LIMIT}}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Percentage</span>
+          <span class="stat-value">{{PERCENTAGE}}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Remaining</span>
+          <span class="stat-value">{{REMAINING}} calls</span>
+        </div>
+      </div>
+      
+      <p><strong>What happens when quota is exceeded:</strong></p>
+      <ul>
+        <li><strong>OpenWeatherMap:</strong> Returns cached data or null (no solar scores)</li>
+        <li><strong>Perspective API:</strong> Skips toxicity check, flags for manual review</li>
+        <li><strong>Brevo SMTP:</strong> Emails are logged but not sent (critical failure)</li>
+      </ul>
+      
+      <a href="{{APP_URL}}/admin/quotas" class="btn">View Quota Dashboard</a>
+      
+      <p style="margin-top: 24px; font-size: 14px; color: #6b7280;">
+        This is an automated alert sent when a service crosses 80% of its daily limit. Alerts are sent once per threshold crossing per day.
+      </p>
+    </div>
+    <div class="footer">
+      &copy; {{YEAR}} SolarSpot. All rights reserved.<br/>
+      This email was sent to all admin users.
+    </div>
+  </div>
+</body>
+</html>

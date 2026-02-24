@@ -1,0 +1,17 @@
+Station Approved! ✅
+
+Hi {{DISPLAY_NAME}},
+
+Your station submission has been approved by our moderation team!
+
+Station: {{STATION_NAME}}
+
+Your station is now live on SolarSpot and visible to all users. Thank you for contributing to our growing network of solar-powered charging stations!
+
+View your station: {{STATION_URL}}
+
+Users can now find, review, and get directions to your station. Keep an eye on reviews and ratings!
+
+---
+© {{YEAR}} SolarSpot. All rights reserved.
+SE3040 Application Frameworks · SLIIT

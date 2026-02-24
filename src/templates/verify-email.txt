@@ -1,0 +1,17 @@
+SolarSpot — Verify Your Email Address
+
+Hi {{DISPLAY_NAME}},
+
+Welcome to SolarSpot! We're excited to have you join our community of solar energy enthusiasts.
+
+To get started, please verify your email address by clicking the link below:
+
+{{VERIFY_URL}}
+
+⚠️ This link will expire in {{EXPIRY_HOURS}} hours.
+
+If you didn't create an account with SolarSpot, you can safely ignore this email.
+
+---
+© {{YEAR}} SolarSpot. All rights reserved.
+SE3040 Application Frameworks · SLIIT

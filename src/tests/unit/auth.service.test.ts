@@ -2,18 +2,24 @@ import crypto from 'crypto';
 import * as authService from '@modules/users/auth.service';
 import ApiError from '@utils/ApiError';
 
-
 jest.mock('@modules/users/user.model');
-jest.mock('@utils/email.service');
+jest.mock('@utils/email.service', () => ({
+  __esModule: true,
+  default: {
+    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+    sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
+  },
+}));
 jest.mock('jsonwebtoken');
 
 import User from '@modules/users/user.model';
-import * as emailService from '@utils/email.service';
+import emailService from '@utils/email.service';
 import jwt from 'jsonwebtoken';
 
 const MockUser = User as jest.Mocked<typeof User>;
 const mockJwt = jwt as jest.Mocked<typeof jwt>;
-const mockEmail = emailService as jest.Mocked<typeof emailService>;
+const mockEmailService = emailService as jest.Mocked<typeof emailService>;
 
 
 function sha256(data: string): string {
@@ -51,7 +57,7 @@ describe('authService.register()', () => {
     const savedUser = makeMockUser();
     (MockUser.create as jest.Mock) = jest.fn().mockResolvedValue(savedUser);
 
-    mockEmail.sendVerificationEmail = jest.fn().mockResolvedValue(undefined);
+    mockEmailService.sendVerificationEmail = jest.fn().mockResolvedValue(undefined);
 
     const result = await authService.register('test@example.com', 'password123', 'Test User');
 
@@ -61,7 +67,7 @@ describe('authService.register()', () => {
         displayName: 'Test User',
       })
     );
-    expect(mockEmail.sendVerificationEmail).toHaveBeenCalledTimes(1);
+    expect(mockEmailService.sendVerificationEmail).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       email: 'test@example.com',
       displayName: 'Test User',
@@ -220,11 +226,11 @@ describe('authService.forgotPassword()', () => {
   it('sends reset email when account is found, still returns same message', async () => {
     const mockUser = makeMockUser();
     MockUser.findOne = jest.fn().mockResolvedValue(mockUser);
-    mockEmail.sendPasswordResetEmail = jest.fn().mockResolvedValue(undefined);
+    mockEmailService.sendPasswordResetEmail = jest.fn().mockResolvedValue(undefined);
 
     const result = await authService.forgotPassword('test@example.com');
 
-    expect(mockEmail.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+    expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
     expect(result.message).toBe('If an account exists, a reset link has been sent');
   });
 });

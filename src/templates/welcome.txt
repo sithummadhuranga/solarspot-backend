@@ -1,0 +1,20 @@
+Welcome to SolarSpot! 🎉
+
+Hi {{DISPLAY_NAME}},
+
+Your email has been verified successfully. You're all set to start exploring solar-powered charging stations across Sri Lanka!
+
+Here's what you can do now:
+
+✅ Discover Stations — Find solar charging stations near you on our interactive map
+✅ Submit Stations — Share your favorite stations with the community
+✅ Write Reviews — Help others by rating and reviewing stations
+✅ Check Weather — View real-time solar energy forecasts for each station
+
+Get started: {{MAP_URL}}
+
+Need help? Check out our user guide: {{APP_URL}}/docs
+
+---
+© {{YEAR}} SolarSpot. All rights reserved.
+SE3040 Application Frameworks · SLIIT

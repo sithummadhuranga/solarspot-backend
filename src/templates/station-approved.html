@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Your Station Has Been Approved!</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .header { background: linear-gradient(135deg, #f59e0b 0%, #10b981 100%); padding: 32px; text-align: center; }
+    .header h1 { color: #fff; margin: 0; font-size: 26px; letter-spacing: -0.5px; }
+    .header p  { color: rgba(255,255,255,.85); margin: 6px 0 0; font-size: 14px; }
+    .body { padding: 32px; color: #333; line-height: 1.6; }
+    .body h2 { color: #1a1a1a; margin-top: 0; }
+    .btn { display: inline-block; margin: 24px 0; padding: 14px 32px; background: #10b981; color: #fff !important; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 15px; }
+    .btn:hover { background: #059669; }
+    .footer { background: #f9fafb; border-top: 1px solid #e5e7eb; padding: 20px 32px; font-size: 12px; color: #9ca3af; text-align: center; }
+    .success { background: #f0fdf4; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 14px; color: #065f46; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>☀️ SolarSpot</h1>
+      <p>Discover solar-powered charging stations near you</p>
+    </div>
+    <div class="body">
+      <h2>Great news, {{DISPLAY_NAME}}! ✅</h2>
+      <p>Your station submission has been approved by our moderation team!</p>
+      
+      <div class="success">
+        <strong>{{STATION_NAME}}</strong> is now live on SolarSpot and visible to all users.
+      </div>
+      
+      <p>Thank you for contributing to our growing network of solar-powered charging stations. Your contribution helps make sustainable energy more accessible to everyone!</p>
+      
+      <a href="{{STATION_URL}}" class="btn">View Your Station</a>
+      
+      <p style="margin-top: 24px; font-size: 14px; color: #6b7280;">
+        Users can now find, review, and get directions to your station. Keep an eye on reviews and ratings!
+      </p>
+    </div>
+    <div class="footer">
+      &copy; {{YEAR}} SolarSpot. All rights reserved.<br/>
+      SE3040 Application Frameworks · SLIIT
+    </div>
+  </div>
+</body>
+</html>

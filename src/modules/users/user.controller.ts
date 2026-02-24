@@ -18,6 +18,11 @@ export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   ApiResponse.success(res, updated, 'Profile updated');
 });
 
+export const deleteMe = asyncHandler(async (req: Request, res: Response) => {
+  const result = await userService.deleteMe((req.user as { _id: string })._id.toString());
+  ApiResponse.success(res, null, result.message);
+});
+
 export const getPublicProfile = asyncHandler(async (req: Request, res: Response) => {
   const profile = await userService.getPublicProfile(req.params.id as string);
   ApiResponse.success(res, profile, 'Public profile retrieved');
