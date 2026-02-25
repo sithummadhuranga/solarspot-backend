@@ -131,7 +131,7 @@ describe('AuthService.register', () => {
 // ─── login ───────────────────────────────────────────────────────────────────
 
 describe('AuthService.login', () => {
-  const userWithPassword = {
+  const _userWithPassword = {
     ...fakeUser,
     select: jest.fn().mockReturnThis(),
     populate: jest.fn().mockResolvedValue({ ...fakeUser }),

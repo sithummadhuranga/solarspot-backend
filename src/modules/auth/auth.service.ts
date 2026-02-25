@@ -30,11 +30,16 @@ const EMAIL_VERIFY_EXPIRY_HOURS = 24;
 const PASSWORD_RESET_EXPIRY_MINUTES = 60;
 
 function generateAccessToken(userId: string): string {
+  // jsonwebtoken@9 types incorrectly require `number` for `expiresIn` when using string
+  // duration values ('15m', '7d'). The library accepts strings at runtime — this is a
+  // known upstream type defect (DefinitelyTyped#55030). The values are validated
+  // duration strings from env.ts, so the cast is safe.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return jwt.sign({ id: userId }, config.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY } as any);
 }
 
 function generateRefreshToken(userId: string): string {
+  // See generateAccessToken — same upstream jsonwebtoken@9 type defect for string durations.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return jwt.sign({ id: userId }, config.JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY } as any);
 }

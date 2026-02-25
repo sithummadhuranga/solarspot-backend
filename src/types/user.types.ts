@@ -27,6 +27,8 @@ export interface IUser extends Document {
   email: string;
   password: string;             // select: false
   role: Types.ObjectId | IRole; // ref: 'Role'
+  bio?: string;                 // max 500 chars
+  avatarUrl?: string;           // Cloudinary URL
   isActive: boolean;
   isEmailVerified: boolean;
   isBanned: boolean;
@@ -67,13 +69,13 @@ export interface LoginInput {
 }
 
 export interface UpdateProfileInput {
-  displayName?: string;
-  // TODO: Member 4 — add additional updatable fields
+  displayName?: string; // 2–80 chars
+  bio?: string;         // max 500 chars
+  avatarUrl?: string;   // Cloudinary URL
 }
 
 export interface AdminUpdateUserInput {
-  role?: string;
+  role?: string;        // role name slug
   isActive?: boolean;
   isBanned?: boolean;
-  // TODO: Member 4 — add additional admin-updatable fields
 }

@@ -4,7 +4,6 @@
  */
 
 import request  from 'supertest';
-import mongoose from 'mongoose';
 import app      from '../../../app';
 import { connectTestDb, disconnectTestDb, seedCore } from './helpers';
 import { User }       from '@modules/users/user.model';

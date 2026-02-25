@@ -14,7 +14,7 @@
  *   - Write concern: default majority (never override)
  */
 
-import { Schema, model, Types } from 'mongoose';
+import { Schema, model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { IUser } from '@/types';
 
@@ -28,6 +28,15 @@ const userSchema = new Schema<IUser>(
       trim: true,
       minlength: 2,
       maxlength: 80,
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
+    avatarUrl: {
+      type: String,
+      trim: true,
     },
     email: {
       type: String,

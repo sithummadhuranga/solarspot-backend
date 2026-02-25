@@ -51,6 +51,9 @@ export const protect = asyncHandler(
     if (!user || !user.isActive) {
       throw ApiError.unauthorized('Account not found or inactive');
     }
+    if (user.isBanned) {
+      throw ApiError.forbidden('This account has been suspended');
+    }
 
     const role = user.role as IRole;
     req.user = {
@@ -83,7 +86,7 @@ export const optionalAuth = asyncHandler(
       const decoded = jwt.verify(token, config.JWT_SECRET) as { id: string };
 
       const user = await User.findById(decoded.id).populate('role').lean();
-      if (user?.isActive) {
+      if (user?.isActive && !user?.isBanned) {
         const role = user.role as IRole;
         req.user = {
           _id: user._id.toString(),

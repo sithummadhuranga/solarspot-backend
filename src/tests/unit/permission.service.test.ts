@@ -46,7 +46,6 @@ import { RolePermission }            from '@modules/permissions/role_permission.
 import { UserPermissionOverride }    from '@modules/permissions/user_permission_override.model';
 import { AuditLog }                  from '@modules/permissions/audit_log.model';
 import { container }                 from '@/container';
-import ApiError                      from '@utils/ApiError';
 
 const mockPermission        = Permission        as jest.Mocked<typeof Permission>;
 const mockRole              = Role              as jest.Mocked<typeof Role>;

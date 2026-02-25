@@ -5,16 +5,14 @@
  */
 
 import request  from 'supertest';
-import mongoose from 'mongoose';
 import crypto   from 'crypto';
 import app      from '../../../app';
-import { connectTestDb, disconnectTestDb, clearTestDb, seedCore } from './helpers';
+import { connectTestDb, disconnectTestDb, seedCore } from './helpers';
 import { User }                                                    from '@modules/users/user.model';
 
 // Keep the refresh cookie between tests that need it
 let refreshCookie: string;
-let verifyToken: string;
-let resetToken: string;
+let _verifyToken: string; // captured for future email-verification flow tests
 
 const VALID_USER = {
   displayName: 'Integration Tester',
@@ -92,7 +90,7 @@ describe('GET /api/auth/verify-email/:token', () => {
     // Read the raw token from the DB to simulate clicking the email link
     const user = await User.findOne({ email: VALID_USER.email }).select('+emailVerifyToken').lean();
     // token is stored as hash — find it via the raw token field if stored, otherwise skip
-    verifyToken = (user as unknown as Record<string, unknown>)?.emailVerifyTokenRaw as string ?? 'invalid-token';
+    _verifyToken = (user as unknown as Record<string, unknown>)?.emailVerifyTokenRaw as string ?? 'invalid-token';
   });
 
   it('400 — invalid / expired token', async () => {
@@ -104,7 +102,7 @@ describe('GET /api/auth/verify-email/:token', () => {
 // ─── POST /api/auth/login (verified user) ─────────────────────────────────────
 
 describe('POST /api/auth/login — verified user', () => {
-  let accessToken: string;
+  let _accessToken: string;
 
   beforeAll(async () => {
     // Force-verify the test user so we can test login properly
@@ -123,7 +121,7 @@ describe('POST /api/auth/login — verified user', () => {
     expect(res.body.data.accessToken).toBeDefined();
     expect(res.headers['set-cookie']).toBeDefined();
 
-    accessToken = res.body.data.accessToken;
+    _accessToken = res.body.data.accessToken;
     const cookies = (res.headers['set-cookie'] as unknown as string[]);
     refreshCookie = cookies.find(c => c.startsWith('refreshToken'))!;
   });
