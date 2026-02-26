@@ -1,48 +1,45 @@
 /**
- * Weather/Solar cache model — stores OpenWeatherMap + UV API responses per station.
+ * WeatherCache — persists OpenWeatherMap API responses per station in MongoDB.
  *
- * Owner: Member 3 (Solar Intelligence & Weather).
+ * Each station gets one document. The TTL index on `expiresAt` means MongoDB
+ * automatically removes stale documents after 30 minutes — no cron needed.
  *
- * TODO: Member 3 — implement fields and TTL index.
+ * We store both current conditions and the 5-day forecast in the same document
+ * so a single DB read satisfies both the /weather and /forecast endpoints on
+ * a cache hit.
  *
- * Ref: PROJECT_OVERVIEW.md → Data Models → WeatherCache
- *      MASTER_PROMPT.md → Third-party API Caching (Redis or Mongo TTL)
- *      MASTER_PROMPT.md → Quota Service — track OWM + UV API call counts
+ * Owner: Member 3 · Ref: PROJECT_OVERVIEW.md → Third-Party APIs
  */
 
-import { Schema, model, Document } from 'mongoose';
-import type { WeatherData } from '@/types';
+import { Schema, model, Types, Document } from 'mongoose';
+import type { WeatherData, ForecastSlot } from '@/types';
 
-/**
- * WeatherCache document shape.
- * TODO: Member 3 — expand with full WeatherData fields.
- */
+// Strip _raw before persisting — clients never see raw provider payloads
+export type CachedWeatherData = Omit<WeatherData, '_raw'>;
+
 export interface IWeatherCache extends Document {
-  stationId:   unknown;   // Schema.Types.ObjectId → ref: 'Station'
-  coordinates: [number, number]; // [lng, lat]
-  current?:    WeatherData;
-  forecast?:   unknown[];        // ForecastSlot[]
-  solarIndex?: unknown;           // SolarIndex
+  stationId:   Types.ObjectId;
+  coordinates: [number, number];     // [lng, lat] — stored so we can build heatmap without joining Station
+  current?:    CachedWeatherData;
+  forecast?:   ForecastSlot[];
   fetchedAt:   Date;
-  expiresAt:   Date;
+  expiresAt:   Date;                 // TTL index fires when this passes
 }
 
 const weatherCacheSchema = new Schema<IWeatherCache>(
   {
-    // stationId:   { type: Schema.Types.ObjectId, ref: 'Station', required: true, unique: true },
-    // coordinates: { type: [Number], required: true },  // [lng, lat]
-    // current:     { type: Schema.Types.Mixed },        // WeatherData object
-    // forecast:    [{ type: Schema.Types.Mixed }],      // ForecastSlot[]
-    // solarIndex:  { type: Schema.Types.Mixed },        // SolarIndex object
-    // fetchedAt:   { type: Date, required: true },
-    // expiresAt:   { type: Date, required: true },
+    stationId:   { type: Schema.Types.ObjectId, ref: 'Station', required: true, unique: true },
+    coordinates: { type: [Number], required: true },
+    current:     { type: Schema.Types.Mixed },
+    forecast:    { type: [Schema.Types.Mixed] },
+    fetchedAt:   { type: Date, required: true },
+    expiresAt:   { type: Date, required: true },
   },
   { timestamps: false },
 );
 
-// ── Indexes ──────────────────────────────────────────────────────────────────
-// TODO: Member 3 — TTL index so documents auto-expire (e.g. 30 min = 1800 s)
-// weatherCacheSchema.index({ stationId: 1 }, { unique: true });
-// weatherCacheSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// TTL index — the database removes the document once expiresAt has passed.
+// expireAfterSeconds:0 means "expire at the exact time in expiresAt".
+weatherCacheSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const WeatherCache = model<IWeatherCache>('WeatherCache', weatherCacheSchema);
