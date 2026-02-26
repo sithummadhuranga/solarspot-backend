@@ -124,11 +124,12 @@ import usersRouter       from '@modules/users/user.routes';
 import permissionsRouter from '@modules/permissions/permission.routes';
 // import stationsRouter from '@modules/stations/station.routes';  // Member 1
 // import reviewsRouter  from '@modules/reviews/review.routes';    // Member 2
-// import weatherRouter  from '@modules/weather/weather.routes';   // Member 3
+import weatherRouter  from '@modules/weather/weather.routes';
 
-app.use('/api/auth',  authRouter);
-app.use('/api/users', usersRouter);
-app.use('/api',       permissionsRouter); // routes define their own /admin/* paths
+app.use('/api/auth',    authRouter);
+app.use('/api/users',   usersRouter);
+app.use('/api/weather', weatherRouter);
+app.use('/api',         permissionsRouter); // routes define their own /admin/* paths
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
