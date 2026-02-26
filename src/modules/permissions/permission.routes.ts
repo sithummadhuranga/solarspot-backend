@@ -1,40 +1,57 @@
 /**
- * Permission routes — 17 endpoints.
+ * Permission routes — 12 admin endpoints + 1 self-service check endpoint.
  *
- * TODO: Member 4 — uncomment route registrations.
+ * Middleware order (MASTER_PROMPT): protect → checkPermission → validate → controller
  *
  * Ref: PROJECT_OVERVIEW.md → API Endpoints → Permissions
- *      MASTER_PROMPT.md → Route Middleware Order: protect → checkPermission → validate → controller
  */
 
-import { Router } from 'express';
-// import { protect }               from '@middleware/auth.middleware';
-// import { checkPermission }       from '@middleware/rbac.middleware';
-// import { validate }              from '@middleware/validate.middleware';
-// import * as PermController       from './permission.controller';
-// import * as V                    from './permission.validation';
+import { Router }            from 'express';
+import { protect }           from '@middleware/auth.middleware';
+import { checkPermission }   from '@middleware/rbac.middleware';
+import { validate }          from '@middleware/validate.middleware';
+import * as PC               from './permission.controller';
+import * as V                from './permission.validation';
 
 const router = Router();
 
-// ─── Permissions catalog ─────────────────────────────────────────────────────
-// router.get('/permissions',      protect, checkPermission('permissions.list'), PermController.listPermissions);
+// ─── Permissions catalog ──────────────────────────────────────────────────────
+router.get('/admin/permissions',
+  protect, checkPermission('permissions.read'), PC.listPermissions);
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
-// router.get('/roles',            protect, checkPermission('permissions.list'),   PermController.listRoles);
-// router.get('/roles/:id/permissions', protect, checkPermission('permissions.list'), PermController.getRolePermissions);
-// router.post('/roles/:id/permissions',    protect, checkPermission('permissions.assign'), validate(V.assignRolePermSchema), PermController.assignPermissionToRole);
-// router.delete('/roles/:id/permissions/:permId', protect, checkPermission('permissions.revoke'), PermController.removePermissionFromRole);
+router.get('/admin/roles',
+  protect, checkPermission('permissions.read'), PC.listRoles);
+
+router.get('/admin/roles/:id/permissions',
+  protect, checkPermission('permissions.read'), PC.getRolePermissions);
+
+router.post('/admin/roles/:id/permissions',
+  protect, checkPermission('permissions.manage'), validate(V.assignRolePermSchema), PC.assignPermissionToRole);
+
+router.delete('/admin/roles/:id/permissions/:permId',
+  protect, checkPermission('permissions.manage'), PC.removePermissionFromRole);
 
 // ─── User overrides ───────────────────────────────────────────────────────────
-// router.get('/users/:id/permissions',           protect, checkPermission('permissions.list'),   PermController.getUserEffectivePermissions);
-// router.post('/users/:id/permissions',           protect, checkPermission('permissions.assign'), validate(V.overridePermSchema),   PermController.overrideUserPermission);
-// router.delete('/users/:id/permissions/:permId', protect, checkPermission('permissions.revoke'), PermController.removeUserPermissionOverride);
+router.get('/admin/users/:id/permissions',
+  protect, checkPermission('permissions.read'), PC.getUserEffectivePermissions);
 
-// ─── Check (client-side permission gate) ──────────────────────────────────────
-// router.post('/permissions/check', protect, validate(V.checkPermSchema), PermController.checkPermission);
+router.post('/admin/users/:id/permissions',
+  protect, checkPermission('permissions.manage'), validate(V.overridePermSchema), PC.overrideUserPermission);
 
-// ─── Audit + Quota ────────────────────────────────────────────────────────────
-// router.get('/audit-logs', protect, checkPermission('permissions.list'), PermController.listAuditLogs);
-// router.get('/quota',      protect, checkPermission('permissions.list'), PermController.getQuotaStats);
+router.delete('/admin/users/:id/permissions/:permId',
+  protect, checkPermission('permissions.manage'), PC.removeUserPermissionOverride);
+
+// ─── Client-side permission gate ──────────────────────────────────────────────
+router.post('/permissions/check',
+  protect, validate(V.checkPermSchema), PC.checkPermission);
+
+// ─── Audit logs ───────────────────────────────────────────────────────────────
+router.get('/admin/audit-logs',
+  protect, checkPermission('audit.read'), PC.listAuditLogs);
+
+// ─── Quota stats ──────────────────────────────────────────────────────────────
+router.get('/admin/quota',
+  protect, checkPermission('quotas.read'), PC.getQuotaStats);
 
 export default router;

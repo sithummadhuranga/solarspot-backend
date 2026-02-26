@@ -1,36 +1,62 @@
 /**
  * Notification model — in-app notification documents.
  *
- * TODO: Member 4 — implement fields, wire to EmailService for email notifications.
- *
  * Ref: PROJECT_OVERVIEW.md → Data Models → Notification
  */
 
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 export interface INotification extends Document {
-  recipient:  unknown;  // ObjectId → ref: 'User'
-  type:       string;   // e.g. 'station_approved', 'permission_changed', 'quota_alert'
-  title:      string;
-  body:       string;
-  isRead:     boolean;
-  meta?:      Record<string, unknown>;
-  createdAt:  Date;
+  recipient:    Types.ObjectId;
+  type:         string;
+  title:        string;
+  body:         string;
+  targetModel?: string;
+  targetId?:    Types.ObjectId;
+  isRead:       boolean;
+  createdAt:    Date;
 }
 
 const notificationSchema = new Schema<INotification>(
   {
-    // recipient: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    // type:      { type: String, required: true },
-    // title:     { type: String, required: true },
-    // body:      { type: String, required: true },
-    // isRead:    { type: Boolean, default: false },
-    // meta:      { type: Schema.Types.Mixed },
+    recipient: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    type: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    body: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    targetModel: {
+      type: String,
+      trim: true,
+    },
+    targetId: {
+      type: Schema.Types.ObjectId,
+    },
+    isRead: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );
 
-// notificationSchema.index({ recipient: 1, isRead: 1 });
-// notificationSchema.index({ recipient: 1, createdAt: -1 });
+notificationSchema.index({ recipient: 1 });
+notificationSchema.index({ recipient: 1, isRead: 1 });
+notificationSchema.index({ recipient: 1, createdAt: -1 });
+notificationSchema.index({ targetModel: 1, targetId: 1 });
 
 export const Notification = model<INotification>('Notification', notificationSchema);

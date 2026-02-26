@@ -11,16 +11,25 @@
  *      PROJECT_OVERVIEW.md → Seeder Commands → seed:verify
  */
 
+import crypto from 'crypto';
 import { ClientSession } from 'mongoose';
+import { SystemMeta } from '@modules/permissions/system_meta.model';
+import { PERMISSIONS_SEED } from './01_permissions';
+import { POLICIES_SEED }    from './02_policies';
+import { ROLES_SEED }       from './03_roles';
 import logger from '@utils/logger';
 
-// TODO: Member 4 — import SystemMeta model when implemented
-// import { SystemMeta } from '@modules/permissions/system_meta.model';
+function computeManifestHash(): string {
+  const manifest = JSON.stringify({ PERMISSIONS_SEED, POLICIES_SEED, ROLES_SEED });
+  return crypto.createHash('sha256').update(manifest).digest('hex');
+}
 
-export async function seedSystemMeta(_session: ClientSession): Promise<void> {
-  // TODO: Member 4 — implement
-  // 1. Drop existing system_meta document (upsert approach)
-  // 2. Compute seedManifestHash from all seed data
-  // 3. Insert { schemaVersion: '1.0.0', seedManifestHash, seededAt: new Date() }
-  logger.warn('seedSystemMeta: not yet implemented');
+export async function seedSystemMeta(session: ClientSession): Promise<void> {
+  const seedManifestHash = computeManifestHash();
+  await SystemMeta.findOneAndUpdate(
+    {},
+    { $set: { schemaVersion: '1.0.0', seedManifestHash, seededAt: new Date() } },
+    { upsert: true, new: true, session },
+  );
+  logger.info('✅  system_meta seeded');
 }

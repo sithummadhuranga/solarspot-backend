@@ -1,8 +1,6 @@
 /**
  * User / Auth Mongoose model.
  *
- * TODO: Member 4 — implement full schema.
- *
  * Requirements from PROJECT_OVERVIEW.md:
  *   - Indexes: email (unique), role, isActive
  *              emailVerifyToken (sparse), passwordResetToken (sparse), refreshToken (sparse)
@@ -17,37 +15,124 @@
  */
 
 import { Schema, model } from 'mongoose';
-// TODO: Member 4 — add Document, Types back when defining schema fields (Mongoose requires Document for typed models)
+import bcrypt from 'bcryptjs';
 import { IUser } from '@/types';
 
-// TODO: Member 4 — expand this schema with all fields from IUser
+const BCRYPT_ROUNDS = 12;
+
 const userSchema = new Schema<IUser>(
   {
-    // TODO: Member 4
-    // displayName:        { type: String, required: true, trim: true, minlength: 2, maxlength: 80 },
-    // email:              { type: String, required: true, unique: true, lowercase: true, trim: true },
-    // password:           { type: String, required: true, select: false },
-    // role:               { type: Schema.Types.ObjectId, ref: 'Role', required: true },
-    // isActive:           { type: Boolean, default: true },
-    // isEmailVerified:    { type: Boolean, default: false },
-    // isBanned:           { type: Boolean, default: false },
-    // emailVerifyToken:   { type: String, select: false },
-    // passwordResetToken: { type: String, select: false },
-    // refreshToken:       { type: String, select: false },
+    displayName: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 80,
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
+    avatarUrl: {
+      type: String,
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+      minlength: 6,
+    },
+    role: {
+      type: Schema.Types.ObjectId,
+      ref: 'Role',
+      required: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    isBanned: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerifyToken: {
+      type: String,
+      select: false,
+    },
+    emailVerifyExpires: {
+      type: Date,
+      select: false,
+    },
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false,
+    },
+    refreshToken: {
+      type: String,
+      select: false,
+    },
+    deletedAt: {
+      type: Date,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
   },
   { timestamps: true },
 );
 
-// TODO: Member 4 — add indexes
-// userSchema.index({ email: 1 }, { unique: true });
-// userSchema.index({ role: 1 });
-// userSchema.index({ isActive: 1 });
-// userSchema.index({ emailVerifyToken: 1 }, { sparse: true });
-// userSchema.index({ passwordResetToken: 1 }, { sparse: true });
-// userSchema.index({ refreshToken: 1 }, { sparse: true });
+// ─── Indexes ────────────────────────────────────────────────────────────────
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1 });
+userSchema.index({ isActive: 1 });
+userSchema.index({ emailVerifyToken: 1 }, { sparse: true });
+userSchema.index({ passwordResetToken: 1 }, { sparse: true });
+userSchema.index({ refreshToken: 1 }, { sparse: true });
 
-// TODO: Member 4 — add bcrypt pre-save hook (rounds: 12)
+// ─── Bcrypt pre-save hook ───────────────────────────────────────────────────
+// Mongoose 9 async pre-hooks do not receive `next` — simply throw on error.
+userSchema.pre('save', async function () {
+  // Only hash if password is modified or new
+  if (!this.isModified('password')) return;
+  this.password = await bcrypt.hash(this.password, BCRYPT_ROUNDS);
+});
 
-// TODO: Member 4 — add toJSON() to strip sensitive fields
+// ─── Password comparison method ─────────────────────────────────────────────
+userSchema.methods.comparePassword = async function (
+  candidatePassword: string,
+): Promise<boolean> {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+// ─── toJSON override — never expose sensitive fields ────────────────────────
+userSchema.methods.toJSON = function () {
+  const obj = this.toObject();
+  delete obj.password;
+  delete obj.refreshToken;
+  delete obj.emailVerifyToken;
+  delete obj.emailVerifyExpires;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetExpires;
+  delete obj.__v;
+  return obj;
+};
 
 export const User = model<IUser>('User', userSchema);

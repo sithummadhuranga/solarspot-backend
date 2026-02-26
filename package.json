@@ -18,9 +18,11 @@
     "format": "prettier --write \"src/**/*.ts\" app.ts server.ts"
   },
   "dependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "axios": "^1.6.2",
     "bcryptjs": "^3.0.2",
     "compression": "^1.7.4",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^5.0.0",

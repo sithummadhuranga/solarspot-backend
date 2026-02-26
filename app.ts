@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -43,6 +44,7 @@ app.use(
 // ─── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(cookieParser());
 
 // ─── NoSQL injection sanitisation (Express-5-compatible) ───────────────────────
 // express-mongo-sanitize v2 reassigns req.query — illegal in Express 5 (read-only getter).
@@ -116,18 +118,17 @@ if (config.NODE_ENV !== 'production') {
   logger.info(`API docs available at /api/docs`);
 }
 
-// ─── Module routes (mount when implemented) ────────────────────────────────────
-// import authRouter     from '@modules/auth/auth.routes';
-// import usersRouter    from '@modules/users/user.routes';
-// import stationsRouter from '@modules/stations/station.routes';
-// import reviewsRouter  from '@modules/reviews/review.routes';
-// import weatherRouter  from '@modules/weather/weather.routes';
+// ─── Module routes ─────────────────────────────────────────────────────────────
+import authRouter        from '@modules/auth/auth.routes';
+import usersRouter       from '@modules/users/user.routes';
+import permissionsRouter from '@modules/permissions/permission.routes';
+// import stationsRouter from '@modules/stations/station.routes';  // Member 1
+// import reviewsRouter  from '@modules/reviews/review.routes';    // Member 2
+// import weatherRouter  from '@modules/weather/weather.routes';   // Member 3
 
-// app.use('/api/auth',     authRouter);
-// app.use('/api/users',    usersRouter);
-// app.use('/api/stations', stationsRouter);
-// app.use('/api/reviews',  reviewsRouter);
-// app.use('/api/weather',  weatherRouter);
+app.use('/api/auth',  authRouter);
+app.use('/api/users', usersRouter);
+app.use('/api',       permissionsRouter); // routes define their own /admin/* paths
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

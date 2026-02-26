@@ -11,10 +11,8 @@
 
 import { ClientSession } from 'mongoose';
 import { PolicyCondition } from '@/types';
+import { Policy } from '@modules/permissions/policy.model';
 import logger from '@utils/logger';
-
-// TODO: Member 4 — import Policy model when implemented
-// import { Policy } from '@modules/permissions/policy.model';
 
 interface PolicySeed {
   name: string;
@@ -43,8 +41,14 @@ export const POLICIES_SEED: PolicySeed[] = [
   { name: 'Station Approved',            slug: 'station_approved',        condition: 'field_equals',     effect: 'allow', config: { field: 'status', value: 'approved' }, isSystem: true },
 ];
 
-export async function seedPolicies(_session: ClientSession): Promise<void> {
-  // TODO: Member 4 — upsert all 13 policies using POLICIES_SEED above
-  // Use { slug } as the filter key for upsert (idempotent re-runs)
-  logger.warn('seedPolicies: not yet implemented');
+export async function seedPolicies(session: ClientSession): Promise<void> {
+  const ops = POLICIES_SEED.map(p => ({
+    updateOne: {
+      filter: { slug: p.slug },
+      update: { $set: p },
+      upsert: true,
+    },
+  }));
+  await Policy.bulkWrite(ops, { session } as Parameters<typeof Policy.bulkWrite>[1]);
+  logger.info(`✅  policies seeded (${POLICIES_SEED.length})`);
 }

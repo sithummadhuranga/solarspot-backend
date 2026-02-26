@@ -5,7 +5,10 @@
     "noImplicitReturns": false
   },
   "include": [
-    "./**/*.ts",
-    "./**/*.yml"
+    "./**/*.ts"
+  ],
+  "exclude": [
+    "../../node_modules",
+    "../../dist"
   ]
 }

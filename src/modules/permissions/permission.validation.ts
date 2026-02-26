@@ -1,41 +1,41 @@
 /**
  * Permission validation schemas (Joi).
  *
- * TODO: Member 4 — fill in validation rules.
+ * Ref: PROJECT_OVERVIEW.md → API Endpoints → Permissions
+ *      MASTER_PROMPT.md → Validation — Joi + .options({ stripUnknown: true }) Always
  */
 
 import Joi from 'joi';
 
-// TODO: Member 4 — add objectId helper: const objectId = () => Joi.string().hex().length(24);
-//   then uncomment the field rules in each schema below.
+const objectId = () => Joi.string().hex().length(24);
 
 /** POST /admin/roles/:id/permissions */
 export const assignRolePermSchema = Joi.object({
-  // permissionId: objectId().required(),
-  // policyIds:    Joi.array().items(objectId()).default([]),
+  permissionId: objectId().required(),
+  policyIds:    Joi.array().items(objectId()).default([]),
 }).options({ stripUnknown: true });
 
 /** POST /admin/users/:id/permissions */
 export const overridePermSchema = Joi.object({
-  // permissionId: objectId().required(),
-  // granted:      Joi.boolean().required(),
-  // reason:       Joi.string().trim().max(500),
-  // expiresAt:    Joi.date().iso().min('now'),
+  permissionId: objectId().required(),
+  effect:       Joi.string().valid('grant', 'deny').required(),
+  reason:       Joi.string().trim().max(500),
+  expiresAt:    Joi.date().iso().min('now'),
 }).options({ stripUnknown: true });
 
 /** POST /permissions/check */
 export const checkPermSchema = Joi.object({
-  // action:  Joi.string().required(),   // e.g. 'stations.create'
-  // context: Joi.object().default({}),  // arbitrary fields for ABAC conditions
+  action:  Joi.string().required(),
+  context: Joi.object().default({}),
 }).options({ stripUnknown: true });
 
-/** GET /admin/audit-logs */
+/** GET /admin/audit-logs — query string */
 export const auditLogsQuerySchema = Joi.object({
-  // page:       Joi.number().integer().min(1).default(1),
-  // limit:      Joi.number().integer().min(1).max(100).default(20),
-  // actor:      objectId(),
-  // action:     Joi.string(),
-  // result:     Joi.string().valid('granted', 'denied'),
-  // from:       Joi.date().iso(),
-  // to:         Joi.date().iso(),
+  page:     Joi.number().integer().min(1).default(1),
+  limit:    Joi.number().integer().min(1).max(100).default(20),
+  actor:    objectId(),
+  action:   Joi.string(),
+  resource: Joi.string(),
+  from:     Joi.date().iso(),
+  to:       Joi.date().iso(),
 }).options({ stripUnknown: true });
