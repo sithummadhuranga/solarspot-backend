@@ -18,8 +18,9 @@ services:
     # frequently timeout on the shared free builder).
     runtime: node
     branch: main
-    # Compile TypeScript → produces dist/
-    buildCommand: npm ci && npm run build
+    # --include=dev overrides NODE_ENV=production so @types/* and tsc are available during build.
+    # After npm run build produces dist/, the compiled JS needs only production deps at runtime.
+    buildCommand: npm ci --include=dev && npm run build
     # Run the compiled JS (same as `npm start` in package.json)
     startCommand: node dist/server.js
     # Disable Render's built-in auto-deploy so that only a passing CI
