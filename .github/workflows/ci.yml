@@ -57,21 +57,25 @@ jobs:
     env:
       NODE_ENV: test
       # Dummy secrets for CI — never use real credentials here.
-      # Integration tests that need real secrets are skipped in this job.
       MONGODB_URI: mongodb://localhost:27017/solarspot_test
-      JWT_SECRET: ci_test_jwt_secret_must_be_32_chars_x
-      JWT_REFRESH_SECRET: ci_refresh_secret_must_be_32_chars_x
+      JWT_SECRET: ci_test_jwt_secret_must_be_64_chars_long_for_compliance_xyz_abc
       JWT_ACCESS_EXPIRES: 15m
       JWT_REFRESH_EXPIRES: 7d
-      FRONTEND_URL: http://localhost:3000
-      EMAIL_FROM: test@solarspot.app
-      BREVO_SMTP_HOST: smtp-relay.brevo.com
-      BREVO_SMTP_PORT: "587"
-      # Real keys from repo secrets (optional — tests gracefully skip if absent).
-      OPENWEATHERMAP_API_KEY: ${{ secrets.OPENWEATHERMAP_API_KEY }}
+      COOKIE_SECRET: ci_cookie_secret_must_be_32_chars_xQ
+      FRONTEND_URL: http://localhost:5173
+      APP_URL: http://localhost:5173
+      APP_NAME: SolarSpot
+      EMAIL_HOST: smtp-relay.brevo.com
+      EMAIL_PORT: "587"
+      EMAIL_SECURE: "false"
+      EMAIL_FROM_NAME: SolarSpot
+      EMAIL_FROM_ADDRESS: test@solarspot.app
+      EMAIL_PREVIEW: "true"
+      # Real keys from repo secrets (optional — unit tests mock these, integration tests skip if absent)
+      OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
       PERSPECTIVE_API_KEY: ${{ secrets.PERSPECTIVE_API_KEY }}
-      BREVO_SMTP_USER: ${{ secrets.BREVO_SMTP_USER }}
-      BREVO_SMTP_PASS: ${{ secrets.BREVO_SMTP_PASS }}
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
     steps:
       - uses: actions/checkout@v4
 

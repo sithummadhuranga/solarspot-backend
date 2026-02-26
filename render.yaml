@@ -50,11 +50,22 @@ services:
         sync: false          # paste your MongoDB Atlas SRV connection string
 
       # ── JWT (auto-generated — copy values to the frontend env if needed) ────
-      - key: JWT_SECRET
-        generateValue: true  # Render generates a cryptographically secure secret
+      # ── App identity ─────────────────────────────────────────────────────────
+      - key: APP_NAME
+        value: SolarSpot
 
-      - key: JWT_REFRESH_SECRET
-        generateValue: true
+      # Your Render service public URL — needed for email verify/reset links.
+      # Set AFTER first deploy when you know the URL, e.g. https://solarspot-api.onrender.com
+      - key: APP_URL
+        sync: false
+
+      # ── Database ─────────────────────────────────────────────────────────────
+      - key: MONGODB_DB_NAME
+        value: solarspot
+
+      # ── Auth ─────────────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true  # Render generates a cryptographically secure value
 
       - key: JWT_ACCESS_EXPIRES
         value: 15m
@@ -62,29 +73,54 @@ services:
       - key: JWT_REFRESH_EXPIRES
         value: 7d
 
-      # ── CORS (set in dashboard) ─────────────────────────────────────────────
+      # used by cookie-parser signed cookies
+      - key: COOKIE_SECRET
+        generateValue: true
+
+      # ── CORS ─────────────────────────────────────────────────────────────────
+      # Must match your Vercel URL exactly — no trailing slash.
       - key: FRONTEND_URL
-        sync: false          # e.g. https://solarspot.onrender.com  or  https://solarspot.vercel.app
+        sync: false          # e.g. https://solarspot.vercel.app
+
+      # ── Email — Brevo SMTP (set in dashboard) ────────────────────────────────
+      # Variable names must match exactly what env.ts reads via process.env.*
+      - key: EMAIL_HOST
+        value: smtp-relay.brevo.com
+
+      - key: EMAIL_PORT
+        value: "587"
+
+      - key: EMAIL_SECURE
+        value: "false"
+
+      - key: EMAIL_USER
+        sync: false          # your Brevo login email
+
+      - key: EMAIL_PASS
+        sync: false          # your Brevo SMTP API key
+
+      - key: EMAIL_FROM_NAME
+        value: SolarSpot
+
+      - key: EMAIL_FROM_ADDRESS
+        sync: false          # e.g. no-reply@solarspot.app
+
+      - key: EMAIL_PREVIEW
+        value: "false"       # always false in production
 
       # ── Third-party APIs (set in dashboard) ─────────────────────────────────
-      - key: OPENWEATHERMAP_API_KEY
+      - key: OPENWEATHER_API_KEY
         sync: false
 
       - key: PERSPECTIVE_API_KEY
         sync: false
 
-      # ── Email / Brevo (set in dashboard) ────────────────────────────────────
-      - key: BREVO_SMTP_HOST
-        value: smtp-relay.brevo.com
-
-      - key: BREVO_SMTP_PORT
-        value: "587"
-
-      - key: BREVO_SMTP_USER
+      # ── Cloudinary — image CDN (set in dashboard) ────────────────────────────
+      - key: CLOUDINARY_CLOUD_NAME
         sync: false
 
-      - key: BREVO_SMTP_PASS
+      - key: CLOUDINARY_API_KEY
         sync: false
 
-      - key: EMAIL_FROM
-        value: noreply@solarspot.app
+      - key: CLOUDINARY_API_SECRET
+        sync: false
