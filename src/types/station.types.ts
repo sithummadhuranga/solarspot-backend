@@ -1,54 +1,79 @@
 /**
- * Station TypeScript interfaces — Discriminator model (ChargingStation | SolarPanel).
- * Owner: Member 1 — expand fields when implementing station.model.ts.
+ * Station TypeScript interfaces.
+ * Owner: Member 1
  * Ref: PROJECT_OVERVIEW.md → Database → stations collection
  */
 
 import { Document, Types } from 'mongoose';
-import { GeoPoint } from './common.types';
 
 // ─── Station status ──────────────────────────────────────────────────────────
-export type StationStatus = 'pending' | 'approved' | 'rejected';
+export type StationStatus = 'pending' | 'active' | 'inactive' | 'rejected';
 
-// ─── Station discriminator types ────────────────────────────────────────────
-export type StationType = 'ChargingStation' | 'SolarPanel';
+// ─── Connector types ─────────────────────────────────────────────────────────
+export type ConnectorType = 'USB-C' | 'Type-2' | 'CCS' | 'CHAdeMO' | 'Tesla-NACS' | 'AC-Socket';
 
-// ─── Embedded address ───────────────────────────────────────────────────────
-export interface StationAddress {
-  street?: string;
-  city: string;
-  district?: string;
-  province?: string;
-  country: string;
+// ─── Amenity values ──────────────────────────────────────────────────────────
+export type AmenityValue =
+  | 'wifi' | 'cafe' | 'restroom' | 'parking' | 'security'
+  | 'shade' | 'water' | 'repair_shop' | 'ev_parking';
+
+// ─── Sub-document interfaces ─────────────────────────────────────────────────
+export interface IConnector {
+  type: ConnectorType;
+  powerKw: number;
+  count: number;
 }
 
-// ─── Operating hours ────────────────────────────────────────────────────────
-export interface OperatingHours {
-  open: string;  // e.g. "08:00"
-  close: string; // e.g. "18:00"
-  is24Hours: boolean;
+export interface IScheduleEntry {
+  day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+  openTime: string;  // HH:MM
+  closeTime: string; // HH:MM
 }
 
-// ─── Base station document ──────────────────────────────────────────────────
-// TODO: Member 1 — add all fields here when implementing station.model.ts
+export interface IOperatingHours {
+  alwaysOpen: boolean;
+  schedule: IScheduleEntry[];
+}
+
+export interface IStationAddress {
+  street: string | null;
+  city: string | null;
+  district: string | null;
+  country: string | null;
+  postalCode: string | null;
+  formattedAddress: string | null;
+}
+
+export interface IGeoPoint {
+  type: 'Point';
+  coordinates: [number, number]; // [lng, lat]
+}
+
+// ─── Station document ────────────────────────────────────────────────────────
 export interface IStation extends Document {
   _id: Types.ObjectId;
-  stationType: StationType;
   name: string;
   description?: string;
-  address: StationAddress;
-  location: GeoPoint;   // 2dsphere index
+  location?: IGeoPoint | null;
+  geocodePending: boolean;
+  address: IStationAddress;
+  submittedBy: Types.ObjectId;
+  connectors: IConnector[];
+  solarPanelKw: number;
+  amenities: AmenityValue[];
+  images: string[];
+  operatingHours: IOperatingHours;
   status: StationStatus;
-  isActive: boolean;
+  isVerified: boolean;
+  verifiedBy: Types.ObjectId | null;
+  verifiedAt: Date | null;
+  rejectionReason: string | null;
   isFeatured: boolean;
   averageRating: number;
   reviewCount: number;
-  submittedBy: Types.ObjectId;  // ref: 'User'
-  approvedBy?: Types.ObjectId;  // ref: 'User'
-  rejectedBy?: Types.ObjectId;
-  rejectionReason?: string;
-  images?: string[];            // Cloudinary URLs
-  operatingHours?: OperatingHours;
+  isActive: boolean;
+  deletedAt: Date | null;
+  deletedBy: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,14 +82,16 @@ export interface IStation extends Document {
 export interface CreateStationInput {
   name: string;
   description?: string;
-  address: StationAddress;
-  coordinates?: [number, number];
-  stationType: StationType;
-  operatingHours?: OperatingHours;
-  // TODO: Member 1 — add connector types, amenities etc.
+  addressString?: string;
+  lat?: number;
+  lng?: number;
+  connectors: IConnector[];
+  solarPanelKw: number;
+  amenities?: AmenityValue[];
+  images?: string[];
+  operatingHours?: IOperatingHours;
 }
 
-// TODO: Member 1 — extend with additional patch-only fields if needed
 export type UpdateStationInput = Partial<CreateStationInput>;
 
 export interface RejectStationInput {
@@ -74,15 +101,22 @@ export interface RejectStationInput {
 export interface NearbyStationsQuery {
   lat: number;
   lng: number;
-  radiusKm?: number;
+  radius?: number; // km
   limit?: number;
 }
 
 export interface ListStationsQuery {
   page?: number;
   limit?: number;
-  status?: StationStatus;
-  city?: string;
   search?: string;
-  // TODO: Member 1 — add additional filter fields
+  lat?: number;
+  lng?: number;
+  radius?: number;
+  connectorType?: ConnectorType;
+  minRating?: number;
+  isVerified?: boolean;
+  amenities?: string | string[];
+  sortBy?: 'newest' | 'rating' | 'distance' | 'featured';
 }
+
+// PaginationResult is defined in common.types.ts — do not duplicate here

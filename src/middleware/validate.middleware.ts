@@ -22,7 +22,16 @@ export const validate =
       return;
     }
 
-    // Write validated + stripped + defaulted value back so downstream sees clean data
-    (req as unknown as Record<string, unknown>)[part] = value;
+    // Write validated + stripped + defaulted value back so downstream sees clean data.
+    // req.query is a read-only getter in Express 5, so we mutate its contents in-place.
+    if (part === 'query') {
+      const qObj = req.query as Record<string, unknown>;
+      // Remove keys that were stripped by the schema
+      for (const k of Object.keys(qObj)) { if (!(k in value)) delete qObj[k]; }
+      // Add/overwrite with validated+coerced values
+      Object.assign(qObj, value);
+    } else {
+      (req as unknown as Record<string, unknown>)[part] = value;
+    }
     next();
   };
