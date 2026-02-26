@@ -14,10 +14,6 @@ const objectId = Joi.string().hex().length(24).messages({
   'string.length': '{{#label}} must be exactly 24 characters',
 });
 
-const isoDate = Joi.string()
-  .isoDate()
-  .messages({ 'string.isoDate': '{{#label}} must be a valid ISO 8601 date string' });
-
 // ── Route params ──────────────────────────────────────────────────────────────
 
 /** Validates the :stationId param on GET /api/weather/:stationId and sub-routes. */
