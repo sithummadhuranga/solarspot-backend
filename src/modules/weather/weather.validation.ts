@@ -58,8 +58,8 @@ export const bulkRefreshSchema = Joi.object({
 export const exportQuerySchema = Joi.object({
   format:    Joi.string().valid('json', 'csv').default('json'),
   stationId: objectId.optional(),
-  from:      isoDate.optional(),
-  to:        isoDate
+  from:      Joi.date().iso().optional(),
+  to:        Joi.date().iso()
     .optional()
     .when('from', { is: Joi.exist(), then: Joi.date().iso().min(Joi.ref('from')) })
     .messages({
