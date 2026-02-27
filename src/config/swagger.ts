@@ -15,8 +15,12 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
+        url: 'http://localhost:5001',
+        description: 'Local development (Docker)',
+      },
+      {
         url: 'http://localhost:5000',
-        description: 'Local development server',
+        description: 'Local development (bare npm run dev)',
       },
       {
         url: 'https://solarspot-api.onrender.com',
