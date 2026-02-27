@@ -121,12 +121,14 @@ import permissionsRouter from '@modules/permissions/permission.routes';
 import stationsRouter    from '@modules/stations/station.routes';
 import reviewsRouter     from '@modules/reviews/review.routes';
 import weatherRouter     from '@modules/weather/weather.routes';
+import solarRouter       from '@modules/solar/solar.routes';
 
 app.use('/api/auth',        authRouter);
 app.use('/api/users',       usersRouter);
 app.use('/api/stations',    stationsRouter);
 app.use('/api/reviews',     reviewsRouter);
 app.use('/api/weather',     weatherRouter);
+app.use('/api/solar',       solarRouter);
 app.use('/api/permissions', permissionsRouter);
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────

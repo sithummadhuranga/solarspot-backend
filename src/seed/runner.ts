@@ -55,7 +55,7 @@ const DEMO_SEEDERS: SeederEntry[] = [
 type SeedMode = 'full' | 'core' | 'demo' | 'verify';
 
 async function run(mode: SeedMode = 'full'): Promise<void> {
-  await mongoose.connect(config.MONGODB_URI, { dbName: config.MONGODB_DB_NAME });
+  await mongoose.connect(config.MONGODB_URI);
   logger.info(`Seed runner connected to MongoDB [mode: ${mode}]`);
 
   if (mode === 'verify') {
@@ -91,8 +91,10 @@ async function run(mode: SeedMode = 'full'): Promise<void> {
     return;
   }
 
-  // Run all seeders in a single transaction — all or nothing (Atomicity rule)
+  // Run all seeders — use a transaction when the server supports it (replica set / Atlas),
+  // otherwise fall back to sequential upserts without a session (standalone dev MongoDB).
   const session = await mongoose.startSession();
+  let usedTransaction = false;
   try {
     await session.withTransaction(async () => {
       for (const seeder of seeders) {
@@ -101,11 +103,24 @@ async function run(mode: SeedMode = 'full'): Promise<void> {
         logger.info(`✓ ${seeder.name}`);
       }
     });
-    logger.info(`Seed complete [mode: ${mode}] — ${seeders.length} seeders ran`);
+    usedTransaction = true;
+  } catch (err: unknown) {
+    const msg = (err as { message?: string })?.message ?? '';
+    if (msg.includes('replica set') || msg.includes('Transaction numbers')) {
+      logger.warn('Transactions not supported on this MongoDB instance — falling back to no-session mode');
+      for (const seeder of seeders) {
+        logger.info(`Running seeder: ${seeder.name}`);
+        await seeder.fn(undefined as unknown as mongoose.ClientSession);
+        logger.info(`✓ ${seeder.name}`);
+      }
+    } else {
+      throw err;
+    }
   } finally {
     session.endSession();
     await mongoose.disconnect();
   }
+  logger.info(`Seed complete [mode: ${mode}] — ${seeders.length} seeders ran${usedTransaction ? ' (with transaction)' : ' (no-session fallback)'}`);
 }
 
 // CLI entry point

@@ -13,7 +13,7 @@ import UserService from './user.service';
 
 /**
  * @swagger
- * /users/me:
+ * /api/users/me:
  *   get:
  *     summary: Get own profile
  *     tags: [Users]
@@ -33,7 +33,7 @@ export const getMe = asyncHandler(async (req: AuthRequest, res: Response) => {
 
 /**
  * @swagger
- * /users/me:
+ * /api/users/me:
  *   put:
  *     summary: Update own profile
  *     tags: [Users]
@@ -51,7 +51,7 @@ export const updateMe = asyncHandler(async (req: AuthRequest, res: Response) => 
 
 /**
  * @swagger
- * /users/me:
+ * /api/users/me:
  *   delete:
  *     summary: Soft-delete own account
  *     tags: [Users]
@@ -70,7 +70,7 @@ export const deleteMe = asyncHandler(async (req: AuthRequest, res: Response) => 
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   get:
  *     summary: Get a public user profile by ID
  *     tags: [Users]
@@ -94,7 +94,7 @@ export const getUserById = asyncHandler(async (req: AuthRequest, res: Response) 
 
 /**
  * @swagger
- * /users:
+ * /api/users:
  *   get:
  *     summary: List all users (admin)
  *     tags: [Users]
@@ -119,7 +119,7 @@ export const listUsers = asyncHandler(async (req: AuthRequest, res: Response) =>
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   put:
  *     summary: Admin update user (role, isActive, isBanned)
  *     tags: [Users]

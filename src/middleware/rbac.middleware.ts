@@ -4,11 +4,20 @@ import { container } from '@/container';
 import ApiError from '@utils/ApiError';
 import { PermissionAction } from '@/types';
 
-/** Role hierarchy — higher number = more permissions */
+/** Role hierarchy — mirrors the seeded roleLevel values in the roles collection.
+ *  Used as a fallback when roleLevel is absent from req.user (e.g. old tokens).
+ *  Primary path: roleLevel is now embedded in the JWT access token by auth.service. */
 export const ROLES = {
-  user: 1,
-  moderator: 2,
-  admin: 3,
+  guest:                0,
+  user:                 1,
+  station_owner:        2,
+  featured_contributor: 2,
+  trusted_reviewer:     2,
+  review_moderator:     3,
+  weather_analyst:      3,
+  permission_auditor:   3,
+  moderator:            3,
+  admin:                4,
 } as const;
 
 export type RoleName = keyof typeof ROLES;
