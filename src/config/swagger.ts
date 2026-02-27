@@ -67,6 +67,22 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      responses: {
+        ValidationError: {
+          description: 'Request body / query failed validation',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiError' },
+              example: {
+                success: false,
+                message: 'Validation failed',
+                errors: ['name is required', 'solarPanelKw must be a number'],
+                statusCode: 422,
+              },
+            },
+          },
+        },
+      },
     },
     security: [{ bearerAuth: [] }],
   },

@@ -54,7 +54,11 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 120,
       amenities: ['wifi', 'cafe', 'restroom', 'parking', 'security', 'shade'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: true, schedule: [] },
       status: 'active' as const,
       isVerified: true,
@@ -77,7 +81,11 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 80,
       amenities: ['wifi', 'parking', 'restroom', 'shade'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1625221175480-9e17e27c18f0?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1611365892117-00ac5ef43c90?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: false, schedule: [
         { day: 'Mon' as const, openTime: '07:00', closeTime: '21:00' },
         { day: 'Tue' as const, openTime: '07:00', closeTime: '21:00' },
@@ -108,7 +116,11 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 60,
       amenities: ['wifi', 'cafe', 'shade', 'parking'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: false, schedule: [
         { day: 'Mon' as const, openTime: '08:00', closeTime: '20:00' },
         { day: 'Tue' as const, openTime: '08:00', closeTime: '20:00' },
@@ -140,7 +152,11 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 50,
       amenities: ['wifi', 'restroom', 'parking', 'water'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1548613053-22087dd8edb8?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: true, schedule: [] },
       status: 'active' as const,
       isVerified: true,
@@ -163,7 +179,10 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 75,
       amenities: ['parking', 'restroom', 'shade', 'water', 'security'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1611365892117-00ac5ef43c90?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: false, schedule: [
         { day: 'Mon' as const, openTime: '06:00', closeTime: '20:00' },
         { day: 'Tue' as const, openTime: '06:00', closeTime: '20:00' },
@@ -195,7 +214,12 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 200,
       amenities: ['wifi', 'parking', 'security', 'repair_shop', 'ev_parking'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1548613053-22087dd8edb8?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1611365892117-00ac5ef43c90?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: true, schedule: [] },
       status: 'active' as const,
       isVerified: true,
@@ -219,7 +243,10 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 90,
       amenities: ['wifi', 'parking', 'restroom', 'water'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: false, schedule: [
         { day: 'Mon' as const, openTime: '07:00', closeTime: '20:00' },
         { day: 'Tue' as const, openTime: '07:00', closeTime: '20:00' },
@@ -250,7 +277,10 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 45,
       amenities: ['parking', 'shade'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: false, schedule: [
         { day: 'Mon' as const, openTime: '08:00', closeTime: '19:00' },
         { day: 'Tue' as const, openTime: '08:00', closeTime: '19:00' },
@@ -281,7 +311,10 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 70,
       amenities: ['wifi', 'parking', 'security', 'water'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1548613053-22087dd8edb8?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1611365892117-00ac5ef43c90?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: true, schedule: [] },
       status: 'pending' as const,
       isVerified: false,
@@ -304,7 +337,9 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       ],
       solarPanelKw: 20,
       amenities: ['parking'],
-      images: [],
+      images: [
+        'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=800&q=80',
+      ],
       operatingHours: { alwaysOpen: false, schedule: [
         { day: 'Mon' as const, openTime: '09:00', closeTime: '17:00' },
         { day: 'Sat' as const, openTime: '09:00', closeTime: '15:00' },
