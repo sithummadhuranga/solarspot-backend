@@ -35,6 +35,8 @@ import { seedPolicies }        from './02_policies';
 import { seedRoles }           from './03_roles';
 import { seedRolePermissions } from './04_role_permissions';
 import { seedDemoUsers }       from './05_demo_users';
+import { seedDemoStations }    from './06_demo_stations';
+import { seedDemoReviews }     from './07_demo_reviews';
 
 type SeederEntry = { name: string; fn: (session: mongoose.ClientSession) => Promise<void> };
 
@@ -48,8 +50,8 @@ const CORE_SEEDERS: SeederEntry[] = [
 
 const DEMO_SEEDERS: SeederEntry[] = [
   { name: '05_demo_users',     fn: seedDemoUsers },
-  // { name: '06_demo_stations',  fn: seedDemoStations },  // Member 1
-  // { name: '07_demo_reviews',   fn: seedDemoReviews },   // Member 2
+  { name: '06_demo_stations',  fn: seedDemoStations },
+  { name: '07_demo_reviews',   fn: seedDemoReviews },
 ];
 
 type SeedMode = 'full' | 'core' | 'demo' | 'verify';

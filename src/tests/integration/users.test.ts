@@ -15,8 +15,8 @@ let adminToken: string;
 let adminUserId: string;
 let regularUserId: string;
 
-const REG_USER = { displayName: 'Regular User', email: `reg-${Date.now()}@test.example`, password: 'Regular1!' };
-const ADM_USER = { displayName: 'Admin User',   email: `adm-${Date.now()}@test.example`, password: 'Admin123!' };
+const REG_USER = { displayName: 'Regular User', email: `reg-${Date.now()}@test.com`, password: 'Regular1!' };
+const ADM_USER = { displayName: 'Admin User',   email: `adm-${Date.now()}@test.com`, password: 'Admin123!' };
 
 /** Register + force-verify email + login → return access token */
 async function registerAndLogin(payload: typeof REG_USER): Promise<{ token: string; userId: string }> {

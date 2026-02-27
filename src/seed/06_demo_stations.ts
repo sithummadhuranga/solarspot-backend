@@ -423,7 +423,7 @@ export async function seedDemoStations(session: ClientSession): Promise<void> {
           deletedBy: null,
         },
       },
-      { upsert: true, new: true, session },
+      { upsert: true, returnDocument: 'after', session },
     );
   }
 

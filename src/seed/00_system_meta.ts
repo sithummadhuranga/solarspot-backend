@@ -29,7 +29,7 @@ export async function seedSystemMeta(session: ClientSession): Promise<void> {
   await SystemMeta.findOneAndUpdate(
     {},
     { $set: { schemaVersion: '1.0.0', seedManifestHash, seededAt: new Date() } },
-    { upsert: true, new: true, session },
+    { upsert: true, returnDocument: 'after', session },
   );
   logger.info('✅  system_meta seeded');
 }

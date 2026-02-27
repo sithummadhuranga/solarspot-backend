@@ -141,7 +141,7 @@ class PermissionService {
       const doc = await UserPermissionOverride.findOneAndUpdate(
         { user: userId, permission: permissionId },
         { $set: { effect, reason, grantedBy: grantedById, expiresAt: expiresAt ?? null } },
-        { upsert: true, new: true, session },
+        { upsert: true, returnDocument: 'after', session },
       );
       override = doc as unknown as IUserPermissionOverride;
 

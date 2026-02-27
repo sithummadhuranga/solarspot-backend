@@ -62,7 +62,7 @@ export class MongoQuotaStore implements IQuotaStore {
     const result = await QuotaUsage.findOneAndUpdate(
       { service, date },
       { $inc: { count: 1 } },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
     return result.count;
   }
