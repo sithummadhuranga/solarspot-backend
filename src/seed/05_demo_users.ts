@@ -51,7 +51,7 @@ export async function seedDemoUsers(session: ClientSession): Promise<void> {
           isActive:        true,
         },
       },
-      { upsert: true, new: true, session },
+      { upsert: true, returnDocument: 'after', session },
     );
   }
   logger.info(`✅  demo users seeded (${DEMO_USERS.length})`);

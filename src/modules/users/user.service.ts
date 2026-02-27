@@ -31,7 +31,7 @@ class UserService {
     const user = await User.findByIdAndUpdate(
       userId,
       { $set: input },
-      { new: true, runValidators: true },
+      { returnDocument: 'after', runValidators: true },
     ).populate('role');
 
     if (!user) throw ApiError.notFound('User not found');

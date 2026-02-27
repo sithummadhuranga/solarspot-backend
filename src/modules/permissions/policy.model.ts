@@ -39,7 +39,7 @@ const policySchema = new Schema<IPolicy>(
   { timestamps: true },
 );
 
-policySchema.index({ slug: 1 }, { unique: true });
+// slug index already created by `unique: true` on the field — only add non-duplicate indexes
 policySchema.index({ condition: 1 });
 
 export const Policy = model<IPolicy>('Policy', policySchema);
