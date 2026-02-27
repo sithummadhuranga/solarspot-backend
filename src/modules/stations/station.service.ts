@@ -156,6 +156,10 @@ export async function updateStation(id: string, input: UpdateStationInput, reque
   const station = await Station.findOne({ _id: id, isActive: true });
   if (!station) throw ApiError.notFound('Station not found');
 
+  if (station.submittedBy.toString() !== requesterId) {
+    throw ApiError.forbidden('You are not authorized to update this station');
+  }
+
   const { name, description, addressString, lat: inputLat, lng: inputLng, connectors, solarPanelKw, amenities, images, operatingHours } = input;
 
   if (name !== undefined) station.name = name;

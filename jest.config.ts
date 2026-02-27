@@ -10,11 +10,19 @@ const config: Config = {
     '!src/config/swagger.ts',
     '!src/templates/**',
   ],
-  // Coverage thresholds disabled until Eval 02 — Modules 1, 2, 3 are still stubs.
-  // Re-enable once all 4 members have implemented their modules:
-  //   coverageThreshold: {
-  //     global: { lines: 75, functions: 75, branches: 65 },
-  //   },
+  coverageThreshold: {
+    // Global is intentionally minimal while only one member's tests exist.
+    // Each team member adds their own per-file entry when implementing their tests.
+    // Tighten global values once all modules have coverage.
+    global: { lines: 0, functions: 0, branches: 0 },
+    // ── Member 1 — Stations (80%+ per §9.1) ──────────────────────────────
+    './src/modules/stations/station.service.ts': { lines: 80, functions: 80, branches: 70 },
+    // ── Members 2–4 add their entries below when implementing their tests ─
+    // './src/modules/reviews/review.service.ts':  { lines: 80, functions: 80, branches: 70 },
+    // './src/modules/weather/weather.service.ts':  { lines: 80, functions: 80, branches: 70 },
+    // './src/modules/auth/auth.service.ts':        { lines: 80, functions: 80, branches: 70 },
+    // './src/modules/users/user.service.ts':       { lines: 80, functions: 80, branches: 70 },
+  },
   moduleNameMapper: {
     '^@/(.*)$':          '<rootDir>/src/$1',
     '^@config/(.*)$':    '<rootDir>/src/config/$1',

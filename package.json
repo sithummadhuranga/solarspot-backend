@@ -21,6 +21,8 @@
     "test:unit": "jest --config jest.config.ts --testPathPattern=tests/unit --coverage --forceExit",
     "test:integration": "jest --config jest.integration.config.ts --runInBand --forceExit",
     "test:coverage": "jest --config jest.config.ts --coverage --runInBand --forceExit",
+    "test:perf":     "npx artillery run src/tests/performance/artillery.yml --output report.json",
+    "test:perf:report": "npx artillery report report.json",
     "lint": "eslint src app.ts server.ts",
     "format": "prettier --write \"src/**/*.ts\" app.ts server.ts"
   },

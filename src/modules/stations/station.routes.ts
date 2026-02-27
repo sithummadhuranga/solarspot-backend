@@ -16,7 +16,7 @@ router.get('/search',  validate(V.searchQuerySchema, 'query'),       StationCont
 // ─── Moderator / Admin ─────────────────────────────────────────────────────────
 router.get('/pending',
   protect,
-  checkPermission('stations.read-pending'),
+  checkPermission('stations:viewPending'),
   StationController.getPendingStations
 );
 
@@ -44,20 +44,20 @@ router.delete('/:id',
 // ─── Moderation ───────────────────────────────────────────────────────────────
 router.patch('/:id/approve',
   protect,
-  checkPermission('stations.approve'),
+  checkPermission('stations:approve'),
   StationController.approveStation
 );
 
 router.patch('/:id/reject',
   protect,
-  checkPermission('stations.reject'),
+  checkPermission('stations:reject'),
   validate(V.rejectStationSchema),
   StationController.rejectStation
 );
 
 router.patch('/:id/feature',
   protect,
-  checkPermission('stations.feature'),
+  checkPermission('stations:feature'),
   StationController.featureStation
 );
 

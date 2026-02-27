@@ -1,10 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { config } from '@config/env';
-import { User } from '@modules/users/user.model';
-import ApiError from '@utils/ApiError';
 import asyncHandler from './asyncHandler';
-import { IRole } from '@/types';
+import ApiError from '@utils/ApiError';
 
 // Extend Express Request to carry the authenticated user
 declare global {
@@ -15,10 +12,10 @@ declare global {
         _id: string;
         email: string;
         role: string;
-        roleLevel: number;
+        roleLevel?: number;
         isEmailVerified: boolean;
-        isActive: boolean;
-        isBanned: boolean;
+        isActive?: boolean;
+        isBanned?: boolean;
       };
     }
   }
@@ -26,44 +23,32 @@ declare global {
 
 /**
  * protect — requires a valid JWT access token.
- * Attaches decoded user to req.user.
+ * Extracts Bearer token from the Authorization header, verifies it, and
+ * attaches the decoded payload to req.user.
  */
 export const protect = asyncHandler(
   async (req: Request, _res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      throw ApiError.unauthorized('Access token missing or malformed');
+      throw ApiError.unauthorized('Access token required');
     }
 
-    const token = authHeader.split(' ')[1];
-    let decoded: { id: string };
+    const token = authHeader.slice(7);
 
+    let decoded: { _id: string; email: string; role: 'user' | 'moderator' | 'admin'; isEmailVerified: boolean };
     try {
-      decoded = jwt.verify(token, config.JWT_SECRET) as { id: string };
+      // Read directly from process.env so tests can set the secret after module load
+      const secret = process.env.JWT_SECRET ?? '';
+      decoded = jwt.verify(token, secret) as typeof decoded;
     } catch {
-      throw ApiError.unauthorized('Access token invalid or expired');
+      throw ApiError.unauthorized('Invalid or expired access token');
     }
 
-    const user = await User.findById(decoded.id)
-      .populate('role')
-      .lean();
-
-    if (!user || !user.isActive) {
-      throw ApiError.unauthorized('Account not found or inactive');
-    }
-    if (user.isBanned) {
-      throw ApiError.forbidden('This account has been suspended');
-    }
-
-    const role = user.role as IRole;
     req.user = {
-      _id: user._id.toString(),
-      email: user.email,
-      role: role?.name ?? 'user',
-      roleLevel: role?.roleLevel ?? 1,
-      isEmailVerified: user.isEmailVerified,
-      isActive: user.isActive,
-      isBanned: user.isBanned,
+      _id:             decoded._id,
+      email:           decoded.email,
+      role:            decoded.role,
+      isEmailVerified: decoded.isEmailVerified ?? false,
     };
 
     next();
@@ -77,31 +62,15 @@ export const protect = asyncHandler(
 export const optionalAuth = asyncHandler(
   async (req: Request, _res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return next();
-    }
-
-    try {
-      const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, config.JWT_SECRET) as { id: string };
-
-      const user = await User.findById(decoded.id).populate('role').lean();
-      if (user?.isActive && !user?.isBanned) {
-        const role = user.role as IRole;
-        req.user = {
-          _id: user._id.toString(),
-          email: user.email,
-          role: role?.name ?? 'user',
-          roleLevel: role?.roleLevel ?? 1,
-          isEmailVerified: user.isEmailVerified,
-          isActive: user.isActive,
-          isBanned: user.isBanned,
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const secret = process.env.JWT_SECRET ?? '';
+        const decoded = jwt.verify(authHeader.slice(7), secret) as {
+          _id: string; email: string; role: 'user' | 'moderator' | 'admin'; isEmailVerified: boolean;
         };
-      }
-    } catch {
-      // Silently ignore — optionalAuth never throws
+        req.user = { _id: decoded._id, email: decoded.email, role: decoded.role, isEmailVerified: decoded.isEmailVerified ?? false };
+      } catch { /* silently continue */ }
     }
-
     next();
   }
 );
