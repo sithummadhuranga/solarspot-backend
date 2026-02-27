@@ -37,7 +37,6 @@ import { seedRolePermissions } from './04_role_permissions';
 import { seedDemoUsers }       from './05_demo_users';
 import { seedDemoStations }    from './06_demo_stations';
 import { seedDemoReviews }     from './07_demo_reviews';
-import { seedProductionAdmin } from './prod_admin';
 
 type SeederEntry = { name: string; fn: (session: mongoose.ClientSession) => Promise<void> };
 

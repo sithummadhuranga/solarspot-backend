@@ -45,7 +45,7 @@ class UserService {
       userId,
       { $set: input },
       { returnDocument: 'after', runValidators: true },
-    ).populate('role').lean();
+    ).populate('role');
 
     if (!user) throw ApiError.notFound('User not found');
     return serializeRoleForClient(user as unknown as Record<string, unknown>);
