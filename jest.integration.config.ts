@@ -15,7 +15,7 @@ const config: Config = {
     '^@services/(.*)$':  '<rootDir>/src/services/$1',
     '^@utils/(.*)$':     '<rootDir>/src/utils/$1',
   },
-  testTimeout: 30000,
+  testTimeout: 120000,
   verbose: true,
 };
 

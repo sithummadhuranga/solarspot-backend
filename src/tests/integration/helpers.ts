@@ -1,28 +1,40 @@
 /**
  * Shared helper for integration tests.
+ *
+ * Uses MongoMemoryReplSet (single-node replica set) so Mongoose transactions
+ * work correctly without needing a live MongoDB Atlas connection.
+ * Each test file that calls connectTestDb() gets a fresh in-memory instance.
+ *
  * Call connectTestDb() in beforeAll, disconnectTestDb() in afterAll.
  * Call clearTestDb() in beforeEach to reset state between tests.
  */
 import mongoose from 'mongoose';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { seedPermissions }    from '@/seed/01_permissions';
 import { seedPolicies }       from '@/seed/02_policies';
 import { seedRoles }          from '@/seed/03_roles';
 import { seedRolePermissions } from '@/seed/04_role_permissions';
 
-let connected = false;
+// One in-memory server per test-file process (jest runs files in their own workers)
+let replSet: MongoMemoryReplSet | null = null;
 
 export async function connectTestDb(): Promise<void> {
-  if (!connected) {
-    await mongoose.connect(process.env.MONGODB_URI!, { dbName: process.env.MONGODB_DB_NAME });
-    connected = true;
-  }
+  if (mongoose.connection.readyState !== 0) return;
+
+  replSet = await MongoMemoryReplSet.create({
+    replSet: { count: 1, storageEngine: 'wiredTiger' },
+  });
+
+  const uri = replSet.getUri();
+  await mongoose.connect(uri, { dbName: 'solarspot_test' });
 }
 
 export async function disconnectTestDb(): Promise<void> {
-  if (connected) {
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
-    connected = false;
+  await mongoose.connection.dropDatabase();
+  await mongoose.disconnect();
+  if (replSet) {
+    await replSet.stop();
+    replSet = null;
   }
 }
 

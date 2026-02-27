@@ -20,7 +20,7 @@ const REFRESH_COOKIE_OPTIONS = {
 
 /**
  * @swagger
- * /auth/register:
+ * /api/auth/register:
  *   post:
  *     summary: Register a new user
  *     description: Creates a new user account and sends an email verification link.
@@ -52,7 +52,7 @@ export const register = asyncHandler(async (req, res: Response) => {
 
 /**
  * @swagger
- * /auth/login:
+ * /api/auth/login:
  *   post:
  *     summary: Login and receive access token
  *     description: Returns accessToken in body and sets refreshToken as httpOnly cookie.
@@ -84,7 +84,7 @@ export const login = asyncHandler(async (req, res: Response) => {
 
 /**
  * @swagger
- * /auth/logout:
+ * /api/auth/logout:
  *   post:
  *     summary: Logout and invalidate refresh token
  *     tags: [Auth]
@@ -104,7 +104,7 @@ export const logout = asyncHandler(async (req: AuthRequest, res: Response) => {
 
 /**
  * @swagger
- * /auth/refresh:
+ * /api/auth/refresh:
  *   post:
  *     summary: Refresh access token using httpOnly refresh cookie
  *     tags: [Auth]
@@ -127,7 +127,7 @@ export const refresh = asyncHandler(async (req, res: Response) => {
 
 /**
  * @swagger
- * /auth/verify-email/{token}:
+ * /api/auth/verify-email/{token}:
  *   get:
  *     summary: Verify email address
  *     tags: [Auth]
@@ -150,7 +150,7 @@ export const verifyEmail = asyncHandler(async (req, res: Response) => {
 
 /**
  * @swagger
- * /auth/forgot-password:
+ * /api/auth/forgot-password:
  *   post:
  *     summary: Request a password reset email
  *     tags: [Auth]
@@ -175,7 +175,7 @@ export const forgotPassword = asyncHandler(async (req, res: Response) => {
 
 /**
  * @swagger
- * /auth/reset-password/{token}:
+ * /api/auth/reset-password/{token}:
  *   patch:
  *     summary: Reset password using token from email
  *     tags: [Auth]

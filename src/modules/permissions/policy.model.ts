@@ -17,7 +17,6 @@ const policySchema = new Schema<IPolicy>(
     slug: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     condition: {

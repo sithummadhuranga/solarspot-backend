@@ -13,7 +13,6 @@ const permissionSchema = new Schema<IPermission>(
     action: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     resource: {

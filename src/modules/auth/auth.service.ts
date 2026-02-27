@@ -29,19 +29,32 @@ const REFRESH_TOKEN_EXPIRY = config.JWT_REFRESH_EXPIRES;
 const EMAIL_VERIFY_EXPIRY_HOURS = 24;
 const PASSWORD_RESET_EXPIRY_MINUTES = 60;
 
-function generateAccessToken(userId: string): string {
+/** Full payload embedded in every access token — keeps protect + checkPermission middleware
+ *  stateless (no DB round-trip on every request). Fields mirror what auth.middleware reads. */
+interface AccessTokenPayload {
+  _id: string;
+  email: string;
+  role: string;           // MongoDB ObjectId string of the Role document
+  roleLevel: number;      // pre-baked level so RBAC never falls back to the stale ROLES map
+  isEmailVerified: boolean;
+  isActive: boolean;
+  isBanned: boolean;
+}
+
+function generateAccessToken(payload: AccessTokenPayload): string {
   // jsonwebtoken@9 types incorrectly require `number` for `expiresIn` when using string
   // duration values ('15m', '7d'). The library accepts strings at runtime — this is a
   // known upstream type defect (DefinitelyTyped#55030). The values are validated
   // duration strings from env.ts, so the cast is safe.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return jwt.sign({ id: userId }, config.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY } as any);
+  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY } as any);
 }
 
 function generateRefreshToken(userId: string): string {
-  // See generateAccessToken — same upstream jsonwebtoken@9 type defect for string durations.
+  // Refresh token is a simple credential — only needs to identify the user.
+  // Uses `_id` key to stay consistent with the access token and middleware expectations.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return jwt.sign({ id: userId }, config.JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY } as any);
+  return jwt.sign({ _id: userId }, config.JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY } as any);
 }
 
 function generateSecureToken(): string {
@@ -71,9 +84,9 @@ export class AuthService {
     const emailVerifyToken = generateSecureToken();
     const emailVerifyExpires = new Date(Date.now() + EMAIL_VERIFY_EXPIRY_HOURS * 60 * 60 * 1000);
 
-    const session = await mongoose.startSession();
     let createdUserId!: import('mongoose').Types.ObjectId;
 
+    const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
         const [newUser] = await User.create(
@@ -91,6 +104,24 @@ export class AuthService {
         );
         createdUserId = newUser._id;
       });
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message ?? '';
+      if (msg.includes('replica set') || msg.includes('Transaction numbers')) {
+        // Standalone MongoDB — create without session
+        const [newUser] = await User.create([
+          {
+            displayName,
+            email: email.toLowerCase(),
+            password,
+            role: defaultRole._id,
+            emailVerifyToken,
+            emailVerifyExpires,
+          },
+        ]);
+        createdUserId = newUser._id;
+      } else {
+        throw err;
+      }
     } finally {
       await session.endSession();
     }
@@ -134,7 +165,17 @@ export class AuthService {
       throw new ApiError(401, 'Invalid email or password');
     }
 
-    const accessToken = generateAccessToken(user._id.toString());
+    // Access token embeds role data so RBAC middleware is stateless
+    const roleDoc = user.role as { _id: import('mongoose').Types.ObjectId; roleLevel: number };
+    const accessToken = generateAccessToken({
+      _id:             user._id.toString(),
+      email:           user.email,
+      role:            roleDoc._id.toString(),
+      roleLevel:       roleDoc.roleLevel ?? 1,
+      isEmailVerified: user.isEmailVerified,
+      isActive:        user.isActive,
+      isBanned:        user.isBanned ?? false,
+    });
     const refreshToken = generateRefreshToken(user._id.toString());
 
     // Store refresh token atomically
@@ -161,28 +202,37 @@ export class AuthService {
    * Uses findOneAndUpdate matching on OLD token — race-condition safe (Isolation rule).
    */
   async refresh(oldRefreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-    let decoded: { id: string };
+    let decoded: { _id: string };
 
     try {
-      decoded = jwt.verify(oldRefreshToken, config.JWT_SECRET) as { id: string };
+      decoded = jwt.verify(oldRefreshToken, config.JWT_SECRET) as { _id: string };
     } catch {
       throw new ApiError(401, 'Invalid or expired refresh token');
     }
 
-    const newRefreshToken = generateRefreshToken(decoded.id);
+    const newRefreshToken = generateRefreshToken(decoded._id);
 
-    // Rotate: match on OLD token value — ensures only one rotation wins if two requests race
+    // Rotate: match on OLD token value — ensures only one rotation wins if two requests race.
+    // Populate role so we can bake the fresh roleLevel into the new access token.
     const user = await User.findOneAndUpdate(
-      { _id: decoded.id, refreshToken: oldRefreshToken },
+      { _id: decoded._id, refreshToken: oldRefreshToken },
       { $set: { refreshToken: newRefreshToken } },
       { new: true },
-    );
+    ).populate<{ role: { _id: import('mongoose').Types.ObjectId; roleLevel: number } }>('role');
 
     if (!user) {
       throw new ApiError(401, 'Refresh token has already been rotated or is invalid');
     }
 
-    const accessToken = generateAccessToken(decoded.id);
+    const accessToken = generateAccessToken({
+      _id:             user._id.toString(),
+      email:           user.email,
+      role:            user.role._id.toString(),
+      roleLevel:       user.role.roleLevel ?? 1,
+      isEmailVerified: user.isEmailVerified,
+      isActive:        user.isActive,
+      isBanned:        user.isBanned ?? false,
+    });
     return { accessToken, refreshToken: newRefreshToken };
   }
 

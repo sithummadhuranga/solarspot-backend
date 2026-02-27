@@ -202,13 +202,19 @@ describe('AuthService.refresh', () => {
   it('should return new tokens if old token is valid', async () => {
     const realJwt = jest.requireActual<typeof import('jsonwebtoken')>('jsonwebtoken');
     const oldToken = realJwt.sign(
-      { id: FAKE_USER_ID.toString() },
+      { _id: FAKE_USER_ID.toString() },
       TEST_SECRET,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { expiresIn: '7d' } as any,
     );
 
-    mockUser.findOneAndUpdate.mockResolvedValue({ ...fakeUser, refreshToken: 'new' } as never);
+    mockUser.findOneAndUpdate.mockReturnValue({
+      populate: jest.fn().mockResolvedValue({
+        ...fakeUser,
+        refreshToken: 'new',
+        role: { _id: FAKE_ROLE_ID, roleLevel: 1 },
+      }),
+    } as never);
 
     const result = await AuthService.refresh(oldToken);
     expect(result).toHaveProperty('accessToken');
@@ -218,13 +224,15 @@ describe('AuthService.refresh', () => {
   it('should throw 401 if refresh token not found / already rotated', async () => {
     const realJwt = jest.requireActual<typeof import('jsonwebtoken')>('jsonwebtoken');
     const oldToken = realJwt.sign(
-      { id: FAKE_USER_ID.toString() },
+      { _id: FAKE_USER_ID.toString() },
       TEST_SECRET,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { expiresIn: '7d' } as any,
     );
 
-    mockUser.findOneAndUpdate.mockResolvedValue(null); // token not matched (already rotated)
+    mockUser.findOneAndUpdate.mockReturnValue({
+      populate: jest.fn().mockResolvedValue(null), // token not matched (already rotated)
+    } as never);
     await expect(AuthService.refresh(oldToken)).rejects.toMatchObject({ statusCode: 401 });
   });
 

@@ -13,7 +13,7 @@ import PermissionService from './permission.service';
 
 /**
  * @swagger
- * /admin/permissions:
+ * /api/permissions/admin/permissions:
  *   get:
  *     summary: List all 35 permission actions
  *     tags: [Permissions]
@@ -30,7 +30,7 @@ export const listPermissions = asyncHandler(async (_req: AuthRequest, res: Respo
 
 /**
  * @swagger
- * /admin/roles:
+ * /api/permissions/admin/roles:
  *   get:
  *     summary: List all 10 roles
  *     tags: [Permissions]
@@ -47,7 +47,7 @@ export const listRoles = asyncHandler(async (_req: AuthRequest, res: Response) =
 
 /**
  * @swagger
- * /admin/roles/{id}/permissions:
+ * /api/permissions/admin/roles/{id}/permissions:
  *   get:
  *     summary: Get permissions assigned to a role
  *     tags: [Permissions]
@@ -69,7 +69,7 @@ export const getRolePermissions = asyncHandler(async (req: AuthRequest, res: Res
 
 /**
  * @swagger
- * /admin/roles/{id}/permissions:
+ * /api/permissions/admin/roles/{id}/permissions:
  *   post:
  *     summary: Assign a permission (+ policies) to a role
  *     tags: [Permissions]
@@ -92,7 +92,7 @@ export const assignPermissionToRole = asyncHandler(async (req: AuthRequest, res:
 
 /**
  * @swagger
- * /admin/roles/{id}/permissions/{permId}:
+ * /api/permissions/admin/roles/{id}/permissions/{permId}:
  *   delete:
  *     summary: Remove a permission from a role
  *     tags: [Permissions]
@@ -109,7 +109,7 @@ export const removePermissionFromRole = asyncHandler(async (req: AuthRequest, re
 
 /**
  * @swagger
- * /admin/users/{id}/permissions:
+ * /api/permissions/admin/users/{id}/permissions:
  *   get:
  *     summary: Get effective permissions for a user
  *     tags: [Permissions]
@@ -131,7 +131,7 @@ export const getUserEffectivePermissions = asyncHandler(async (req: AuthRequest,
 
 /**
  * @swagger
- * /admin/users/{id}/permissions:
+ * /api/permissions/admin/users/{id}/permissions:
  *   post:
  *     summary: Override a permission for a user
  *     tags: [Permissions]
@@ -156,7 +156,7 @@ export const overrideUserPermission = asyncHandler(async (req: AuthRequest, res:
 
 /**
  * @swagger
- * /admin/users/{id}/permissions/{permId}:
+ * /api/permissions/admin/users/{id}/permissions/{permId}:
  *   delete:
  *     summary: Remove a user permission override
  *     tags: [Permissions]
@@ -173,7 +173,7 @@ export const removeUserPermissionOverride = asyncHandler(async (req: AuthRequest
 
 /**
  * @swagger
- * /permissions/check:
+ * /api/permissions/check:
  *   post:
  *     summary: Check if the current user has a given permission (frontend use)
  *     tags: [Permissions]
@@ -190,7 +190,7 @@ export const checkPermission = asyncHandler(async (req: AuthRequest, res: Respon
 
 /**
  * @swagger
- * /admin/audit-logs:
+ * /api/permissions/admin/audit-logs:
  *   get:
  *     summary: Paginated audit trail
  *     tags: [Permissions]
@@ -211,7 +211,7 @@ export const listAuditLogs = asyncHandler(async (req: AuthRequest, res: Response
 
 /**
  * @swagger
- * /admin/quota:
+ * /api/permissions/admin/quota:
  *   get:
  *     summary: Third-party API quota stats
  *     tags: [Permissions]
