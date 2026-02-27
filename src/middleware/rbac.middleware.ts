@@ -14,7 +14,6 @@ export const ROLES = {
 export type RoleName = keyof typeof ROLES;
 
 const PERMISSIONS: Record<string, RoleName[]> = {
-  // ── Stations ───────────────────────────────────────────────────────────────
   'stations:create':      ['user', 'moderator', 'admin'],
   'stations:update':      ['user', 'moderator', 'admin'],  
   'stations:approve':     ['moderator', 'admin'],
@@ -24,7 +23,6 @@ const PERMISSIONS: Record<string, RoleName[]> = {
   'stations:feature':     ['moderator', 'admin'],
   'stations:viewStats':   ['user', 'moderator', 'admin'],
 
-  // ── Reviews ────────────────────────────────────────────────────────────────
   'reviews:create':   ['user', 'moderator', 'admin'],
   'reviews:moderate': ['moderator', 'admin'],
 

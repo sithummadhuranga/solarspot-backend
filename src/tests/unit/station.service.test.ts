@@ -1,25 +1,11 @@
-/**
- * Unit tests — StationService
- * Member 1 — Station Management
- *
- * Strategy: all Mongoose models and external API clients are mocked via
- * jest.mock() so the service layer runs in complete isolation.
- *
- * Run: npm test
- * Coverage: npm run test:coverage
- */
-
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
 import * as stationService from '@modules/stations/station.service';
 import { Station } from '@modules/stations/station.model';
 import * as geocoder from '@utils/geocoder';
 
-// ── Mocks ─────────────────────────────────────────────────────────────────────
 
-// Side-effect import in station.service.ts — provide an empty stub
 jest.mock('@modules/users/user.model', () => ({}));
 
-// Mock the Station Mongoose model — we provide the full static interface
 jest.mock('@modules/stations/station.model', () => ({
   Station: {
     find:           jest.fn(),
@@ -28,16 +14,13 @@ jest.mock('@modules/stations/station.model', () => ({
     countDocuments: jest.fn(),
     aggregate:      jest.fn(),
   },
-  // Re-export constants so imports in the service file still resolve
   CONNECTOR_TYPES: ['USB-C', 'Type-2', 'CCS', 'CHAdeMO', 'Tesla-NACS', 'AC-Socket'],
   AMENITY_VALUES:  ['wifi', 'cafe', 'restroom', 'parking', 'security', 'shade', 'water', 'repair_shop', 'ev_parking'],
   DAYS_OF_WEEK:    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
 }));
 
-// Mock geocoder — service calls forwardGeocode / reverseGeocode
 jest.mock('@utils/geocoder');
 
-// Silence logger output during tests
 jest.mock('@utils/logger', () => ({
   __esModule: true,
   default: {
@@ -49,7 +32,6 @@ jest.mock('@utils/logger', () => ({
   },
 }));
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 
 const OWNER_ID   = new Types.ObjectId().toString();
 const OTHER_ID   = new Types.ObjectId().toString();
@@ -67,9 +49,7 @@ const mockGeoResult = {
   formattedAddress: 'Galle Rd, Colombo, Sri Lanka',
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Create a realistic-looking mock Mongoose station document. */
 function makeMockStation(overrides: Record<string, unknown> = {}) {
   return {
     _id:             new Types.ObjectId(STATION_ID),
@@ -100,10 +80,7 @@ function makeMockStation(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/**
- * Returns a mock Mongoose query chain that resolves to the given value when
- * .lean() is finally called. Used for Station.find() and similar chained calls.
- */
+
 function makeChain(resolvedValue: unknown) {
   const chain: Record<string, jest.Mock> = {
     sort:     jest.fn(),
@@ -113,22 +90,16 @@ function makeChain(resolvedValue: unknown) {
     populate: jest.fn(),
     lean:     jest.fn().mockResolvedValue(resolvedValue),
   };
-  // Each method except lean() returns the chain for fluent access
   for (const key of ['sort', 'skip', 'limit', 'select', 'populate']) {
     chain[key].mockReturnValue(chain);
   }
   return chain;
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
-
-// =============================================================================
-// createStation
-// =============================================================================
 
 describe('createStation', () => {
   const baseInput = {
@@ -148,7 +119,6 @@ describe('createStation', () => {
     expect(geocoder.forwardGeocode).toHaveBeenCalledWith('Galle Rd, Colombo');
 
     const createArg = (Station.create as jest.Mock).mock.calls[0][0];
-    // GeoJSON stores [longitude, latitude]
     expect(createArg.location.coordinates).toEqual([mockGeoResult.lng, mockGeoResult.lat]);
     expect(createArg.geocodePending).toBe(false);
     expect(createArg.address.city).toBe('Colombo');
@@ -188,7 +158,6 @@ describe('createStation', () => {
     expect(geocoder.reverseGeocode).toHaveBeenCalledWith(6.9271, 79.8612);
 
     const createArg = (Station.create as jest.Mock).mock.calls[0][0];
-    // GeoJSON format: [lng, lat]
     expect(createArg.location.coordinates).toEqual([79.8612, 6.9271]);
   });
 
@@ -212,9 +181,6 @@ describe('createStation', () => {
   });
 });
 
-// =============================================================================
-// getStationById
-// =============================================================================
 
 describe('getStationById', () => {
   it('returns the station document for a valid ObjectId', async () => {
@@ -246,9 +212,6 @@ describe('getStationById', () => {
   });
 });
 
-// =============================================================================
-// updateStation
-// =============================================================================
 
 describe('updateStation', () => {
   it('allows the owner to update — mutates fields and calls save()', async () => {
@@ -322,9 +285,6 @@ describe('updateStation', () => {
   });
 });
 
-// =============================================================================
-// getNearbyStations
-// =============================================================================
 
 describe('getNearbyStations', () => {
   it('calls Station.aggregate with $geoNear using [lng, lat] coordinate order', async () => {
@@ -334,8 +294,8 @@ describe('getNearbyStations', () => {
 
     const [pipeline] = (Station.aggregate as jest.Mock).mock.calls[0];
     const geoNear = pipeline[0].$geoNear;
-    expect(geoNear.near.coordinates).toEqual([79.8612, 6.9271]); // GeoJSON order
-    expect(geoNear.maxDistance).toBe(5 * 1000);                  // km → metres
+    expect(geoNear.near.coordinates).toEqual([79.8612, 6.9271]); 
+    expect(geoNear.maxDistance).toBe(5 * 1000);                  
     expect(geoNear.spherical).toBe(true);
     expect(geoNear.distanceField).toBe('distanceMetres');
   });
@@ -380,9 +340,6 @@ describe('getNearbyStations', () => {
   });
 });
 
-// =============================================================================
-// listStations
-// =============================================================================
 
 describe('listStations', () => {
   it('returns paginated result with default page and limit', async () => {
@@ -409,7 +366,6 @@ describe('listStations', () => {
 
     const [filterArg] = (Station.find as jest.Mock).mock.calls[0];
     expect(filterArg.location).toBeDefined();
-    // $centerSphere uses [lng, lat]
     expect(filterArg.location.$geoWithin.$centerSphere[0]).toEqual([79.8, 6.9]);
   });
 
@@ -465,9 +421,6 @@ describe('listStations', () => {
   });
 });
 
-// =============================================================================
-// approveStation
-// =============================================================================
 
 describe('approveStation', () => {
   it('sets status to active, isVerified:true, records verifiedBy and verifiedAt', async () => {
@@ -519,9 +472,6 @@ describe('approveStation', () => {
   });
 });
 
-// =============================================================================
-// rejectStation
-// =============================================================================
 
 describe('rejectStation', () => {
   it('sets status to rejected and persists the rejectionReason', async () => {
@@ -553,9 +503,6 @@ describe('rejectStation', () => {
   });
 });
 
-// =============================================================================
-// deleteStation
-// =============================================================================
 
 describe('deleteStation', () => {
   it('soft-deletes by setting isActive:false, deletedAt, and deletedBy', async () => {
@@ -585,9 +532,6 @@ describe('deleteStation', () => {
   });
 });
 
-// =============================================================================
-// featureStation
-// =============================================================================
 
 describe('featureStation', () => {
   it('toggles isFeatured from false to true on an active station', async () => {
@@ -627,10 +571,6 @@ describe('featureStation', () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 });
-
-// =============================================================================
-// getStationStats
-// =============================================================================
 
 describe('getStationStats', () => {
   it('returns a stats object with the expected shape', async () => {

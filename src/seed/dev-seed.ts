@@ -1,21 +1,9 @@
-/**
- * dev-seed.ts — Development seed: roles + test users + 10 Sri Lanka stations
- *
- * Run:   npm run seed:dev
- *
- * Prints JWT tokens (7-day expiry) for every test user — paste directly into
- * Postman Authorization → Bearer Token.
- *
- * ⚠️  DEV ONLY — hard-deletes existing demo data on each run.
- */
-
 import mongoose, { Types } from 'mongoose';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// ─── Config (inline to avoid circular imports) ────────────────────────────────
 const MONGODB_URI     = process.env.MONGODB_URI as string;
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME ?? 'solarspot';
 const JWT_SECRET      = process.env.JWT_SECRET as string;
@@ -25,12 +13,10 @@ if (!MONGODB_URI || !JWT_SECRET) {
   process.exit(1);
 }
 
-// ─── Model imports ────────────────────────────────────────────────────────────
 import { Role } from '@modules/permissions/role.model';
 import { User } from '@modules/users/user.model';
 import { Station } from '@modules/stations/station.model';
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
 
 const ROLES = [
   { name: 'guest',                displayName: 'Visitor',              roleLevel: 0, isSystem: true  },
@@ -54,7 +40,6 @@ const DEMO_USERS = [
 
 function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
   return [
-    // ── ACTIVE stations ──────────────────────────────────────────────────────
     {
       name: 'SolarSpot - Galle Face Colombo',
       description: 'Premium solar charging hub near Galle Face Green with oceanfront parking.',
@@ -221,7 +206,6 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       reviewCount: 15,
     },
 
-    // ── PENDING stations (moderation queue) ───────────────────────────────────
     {
       name: 'SolarSpot - Trincomalee Harbour',
       description: 'Proposed solar charging hub at the historic Trincomalee natural harbour.',
@@ -308,7 +292,6 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
       reviewCount: 0,
     },
 
-    // ── REJECTED station ──────────────────────────────────────────────────────
     {
       name: 'SolarSpot - Batticaloa Lagoon',
       description: 'Solar charging station proposed near Batticaloa Lagoon.',
@@ -338,13 +321,11 @@ function makeStations(ownerIdObj: Types.ObjectId, adminIdObj: Types.ObjectId) {
   ];
 }
 
-// ─── Runner ───────────────────────────────────────────────────────────────────
 
 async function run(): Promise<void> {
   console.log('\n🌱  SolarSpot dev seed — connecting to MongoDB...\n');
   await mongoose.connect(MONGODB_URI, { dbName: MONGODB_DB_NAME });
 
-  // ── 1. Roles ─────────────────────────────────────────────────────────────────
   console.log('📋  Seeding roles...');
   for (const r of ROLES) {
     await Role.findOneAndUpdate({ name: r.name }, r, { upsert: true, new: true });
@@ -355,7 +336,6 @@ async function run(): Promise<void> {
   const allRoles = await Role.find().lean();
   for (const r of allRoles) roleMap.set(r.name, r._id as Types.ObjectId);
 
-  // ── 2. Users ──────────────────────────────────────────────────────────────────
   console.log('\n👤  Seeding users...');
   type CreatedUser = { _id: Types.ObjectId; email: string; roleName: string; displayName: string };
   const createdUsers: CreatedUser[] = [];
@@ -367,7 +347,7 @@ async function run(): Promise<void> {
 
     const user = await new User({
       email:           u.email,
-      password:        u.password,   // pre-save hook hashes this
+      password:        u.password,   
       displayName:     u.displayName,
       role:            roleId,
       isEmailVerified: u.isEmailVerified,
@@ -379,7 +359,6 @@ async function run(): Promise<void> {
     console.log(`    ✓ ${u.roleName.padEnd(16)} ${u.email}`);
   }
 
-  // ── 3. Stations ───────────────────────────────────────────────────────────────
   console.log('\n⚡  Seeding stations...');
   const owner = createdUsers.find(u => u.roleName === 'station_owner');
   const admin = createdUsers.find(u => u.roleName === 'admin');
@@ -403,7 +382,6 @@ async function run(): Promise<void> {
     console.log(`      ${count}x ${status}`);
   }
 
-  // ── 4. Tokens ──────────────────────────────────────────────────────────────────
   console.log('\n🔑  JWT Tokens (7-day expiry) — paste into Postman Bearer Token:\n');
   console.log('─'.repeat(80));
 
@@ -417,7 +395,6 @@ async function run(): Promise<void> {
 
   console.log('\n' + '─'.repeat(80));
 
-  // ── 5. Station IDs for Postman ─────────────────────────────────────────────────
   console.log('\n📍  Station IDs for Postman:\n');
   for (const s of insertedStations) {
     const data = stationData[insertedStations.indexOf(s)];
