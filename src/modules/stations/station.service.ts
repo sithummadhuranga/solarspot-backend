@@ -1,12 +1,11 @@
 import mongoose, { Types, PipelineStage } from 'mongoose';
 import { Station } from './station.model';
-import '@modules/users/user.model'; // Ensure User schema is registered for populate
+import '@modules/users/user.model';
 import type { IStation, ListStationsQuery, NearbyStationsQuery, CreateStationInput, UpdateStationInput } from '@/types';
 import { forwardGeocode, reverseGeocode } from '@utils/geocoder';
 import ApiError from '@utils/ApiError';
 import logger from '@utils/logger';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function buildSort(sortBy: string): Record<string, 1 | -1> {
   switch (sortBy) {
     case 'rating':   return { averageRating: -1, reviewCount: -1 };
@@ -15,12 +14,10 @@ function buildSort(sortBy: string): Record<string, 1 | -1> {
   }
 }
 
-// ─── Service ──────────────────────────────────────────────────────────────────
 export async function listStations(opts: ListStationsQuery) {
   const { page = 1, limit = 10, search, lat, lng, radius = 25, connectorType, minRating, isVerified, amenities, sortBy = 'newest' } = opts;
   const skip = (page - 1) * limit;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filter: Record<string, any> = { isActive: true, status: 'active' };
 
   if (search) filter.$text = { $search: search };
@@ -134,7 +131,7 @@ export async function createStation(input: CreateStationInput & { submittedBy: s
     try {
       const geo = await reverseGeocode(inputLat, inputLng);
       if (geo) addressParts = { street: geo.street, city: geo.city, district: geo.district, country: geo.country, postalCode: geo.postalCode, formattedAddress: geo.formattedAddress };
-    } catch { /* non-fatal */ }
+    } catch {}
   }
 
   const station = await Station.create({
@@ -185,7 +182,7 @@ export async function updateStation(id: string, input: UpdateStationInput, reque
     try {
       const geo = await reverseGeocode(inputLat, inputLng);
       if (geo) station.address = { street: geo.street, city: geo.city, district: geo.district, country: geo.country, postalCode: geo.postalCode, formattedAddress: geo.formattedAddress };
-    } catch { /* non-fatal */ }
+    } catch {}
   }
 
   await station.save();

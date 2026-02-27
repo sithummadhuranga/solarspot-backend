@@ -18,7 +18,6 @@ const operatingHoursSchema = Joi.object({
   schedule:   Joi.array().items(scheduleEntrySchema).default([]),
 });
 
-/** POST /api/stations */
 export const createStationSchema = Joi.object({
   name:           Joi.string().trim().min(3).max(100).required(),
   description:    Joi.string().trim().max(1000),
@@ -32,7 +31,6 @@ export const createStationSchema = Joi.object({
   operatingHours: operatingHoursSchema,
 }).options({ stripUnknown: true });
 
-/** PUT /api/stations/:id */
 export const updateStationSchema = Joi.object({
   name:           Joi.string().trim().min(3).max(100),
   description:    Joi.string().trim().max(1000).allow(''),
@@ -46,12 +44,10 @@ export const updateStationSchema = Joi.object({
   operatingHours: operatingHoursSchema,
 }).min(1).options({ stripUnknown: true });
 
-/** PATCH /api/stations/:id/reject */
 export const rejectStationSchema = Joi.object({
   rejectionReason: Joi.string().trim().min(10).max(500).required(),
 }).options({ stripUnknown: true });
 
-/** GET /api/stations (query) */
 export const listStationsQuerySchema = Joi.object({
   page:          Joi.number().integer().min(1).default(1),
   limit:         Joi.number().integer().min(1).max(100).default(10),
@@ -66,7 +62,6 @@ export const listStationsQuerySchema = Joi.object({
   sortBy:        Joi.string().valid('newest', 'rating', 'distance', 'featured').default('newest'),
 }).options({ stripUnknown: true });
 
-/** GET /api/stations/nearby (query) */
 export const nearbyQuerySchema = Joi.object({
   lat:    Joi.number().min(-90).max(90).required(),
   lng:    Joi.number().min(-180).max(180).required(),
@@ -74,7 +69,6 @@ export const nearbyQuerySchema = Joi.object({
   limit:  Joi.number().integer().min(1).max(100).default(20),
 }).options({ stripUnknown: true });
 
-/** GET /api/stations/search (query) */
 export const searchQuerySchema = Joi.object({
   q:      Joi.string().trim().min(1).max(200).required(),
   page:   Joi.number().integer().min(1).default(1),

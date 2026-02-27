@@ -7,23 +7,22 @@ import * as V from './station.validation';
 
 const router = Router();
 
-// ─── Public ────────────────────────────────────────────────────────────────────
-// NOTE: specific paths (/nearby, /search, /pending) MUST come before /:id
+
 router.get('/',        validate(V.listStationsQuerySchema, 'query'), StationController.listStations);
 router.get('/nearby',  validate(V.nearbyQuerySchema, 'query'),       StationController.getNearbyStations);
 router.get('/search',  validate(V.searchQuerySchema, 'query'),       StationController.searchStations);
 
-// ─── Moderator / Admin ─────────────────────────────────────────────────────────
+
 router.get('/pending',
   protect,
   checkPermission('stations:viewPending'),
   StationController.getPendingStations
 );
 
-// ─── Public (by ID) ───────────────────────────────────────────────────────────
+
 router.get('/:id', StationController.getStationById);
 
-// ─── Authenticated ────────────────────────────────────────────────────────────
+
 router.post('/',
   protect,
   validate(V.createStationSchema),
@@ -41,7 +40,7 @@ router.delete('/:id',
   StationController.deleteStation
 );
 
-// ─── Moderation ───────────────────────────────────────────────────────────────
+
 router.patch('/:id/approve',
   protect,
   checkPermission('stations:approve'),
@@ -61,7 +60,7 @@ router.patch('/:id/feature',
   StationController.featureStation
 );
 
-// ─── Stats ────────────────────────────────────────────────────────────────────
+
 router.get('/:id/stats',
   protect,
   StationController.getStationStats

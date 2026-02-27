@@ -14,24 +14,19 @@ import logger from '@utils/logger';
 
 const app = express();
 
-// ─── Security headers ──────────────────────────────────────────────────────────
 app.use(
   helmet({
     contentSecurityPolicy: config.NODE_ENV === 'production' ? undefined : false,
   })
 );
 
-// ─── CORS ──────────────────────────────────────────────────────────────────────
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
-      // In development allow any localhost port (Vite picks the next free port)
       if (config.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
         return callback(null, true);
       }
-      // In production restrict to FRONTEND_URL
       if (origin === config.FRONTEND_URL) return callback(null, true);
       return callback(new Error(`CORS: origin ${origin} not allowed`));
     },
@@ -41,7 +36,6 @@ app.use(
   })
 );
 
-// ─── HTTP request logger ───────────────────────────────────────────────────────
 app.use(
   morgan('combined', {
     stream: { write: (message) => logger.http(message.trim()) },
@@ -49,14 +43,11 @@ app.use(
   })
 );
 
-// ─── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
-// ─── NoSQL injection sanitisation (Express-5-compatible) ───────────────────────
-// express-mongo-sanitize v2 reassigns req.query — illegal in Express 5 (read-only getter).
-// We sanitize in-place by recursively deleting keys prefixed with $ or containing a dot.
+
 function sanitizeMongo(obj: unknown): void {
   if (!obj || typeof obj !== 'object') return;
   for (const key of Object.keys(obj as Record<string, unknown>)) {

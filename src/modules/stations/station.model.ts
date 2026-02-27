@@ -1,12 +1,10 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import type { IStation, IConnector, IScheduleEntry, IOperatingHours, IStationAddress } from '@/types';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 export const CONNECTOR_TYPES = ['USB-C', 'Type-2', 'CCS', 'CHAdeMO', 'Tesla-NACS', 'AC-Socket'] as const;
 export const AMENITY_VALUES  = ['wifi', 'cafe', 'restroom', 'parking', 'security', 'shade', 'water', 'repair_shop', 'ev_parking'] as const;
 export const DAYS_OF_WEEK    = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
-// ─── Sub-schemas ──────────────────────────────────────────────────────────────
 const ConnectorSchema = new Schema<IConnector>(
   {
     type:    { type: String, enum: CONNECTOR_TYPES, required: true },
@@ -45,7 +43,6 @@ const AddressSchema = new Schema<IStationAddress>(
   { _id: false },
 );
 
-// ─── Main Schema ──────────────────────────────────────────────────────────────
 const stationSchema = new Schema<IStation & Document>(
   {
     name:        { type: String, required: true, trim: true, minlength: 3, maxlength: 100 },
@@ -87,7 +84,6 @@ const stationSchema = new Schema<IStation & Document>(
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } },
 );
 
-// ─── Indexes ──────────────────────────────────────────────────────────────────
 stationSchema.index({ location: '2dsphere' });
 stationSchema.index(
   { name: 'text', description: 'text', 'address.city': 'text' },
