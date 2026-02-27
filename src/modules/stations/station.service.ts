@@ -18,7 +18,7 @@ export async function listStations(opts: ListStationsQuery) {
   const { page = 1, limit = 10, search, lat, lng, radius = 25, connectorType, minRating, isVerified, amenities, sortBy = 'newest' } = opts;
   const skip = (page - 1) * limit;
 
-  const filter: Record<string, any> = { isActive: true, status: 'active' };
+  const filter: Record<string, unknown> = { isActive: true, status: 'active' };
 
   if (search) filter.$text = { $search: search };
 

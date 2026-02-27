@@ -145,10 +145,6 @@ class WeatherService {
 
   /** Loads station by ID and asserts it has coordinates. */
   private async resolveStation(stationId: string): Promise<IStation> {
-    if (!Types.ObjectId.isValid(stationId)) {
-      throw ApiError.notFound('Station not found');
-    }
-
     const station = await Station.findById(stationId).lean<IStation>();
     if (!station || !station.isActive) {
       throw ApiError.notFound('Station not found');
@@ -283,6 +279,11 @@ class WeatherService {
    * Cache-first: in-memory → MongoDB → OWM API.
    */
   async getCurrentWeather(stationId: string): Promise<WeatherData> {
+    // Validate early — new Types.ObjectId() below would throw BSONError for bad IDs
+    if (!Types.ObjectId.isValid(stationId)) {
+      throw ApiError.notFound('Station not found');
+    }
+
     // Layer 1: hot in-memory cache
     const memHit = cacheGet<WeatherData>(cacheKey.current(stationId));
     if (memHit) return memHit;
@@ -303,8 +304,8 @@ class WeatherService {
 
     // Layer 3: live OWM API fetch
     const station = await this.resolveStation(stationId);
-    if (!station.location) throw ApiError.badRequest('Station has no location data');
-    const [lng, lat] = station.location.coordinates;
+    // resolveStation guarantees location.coordinates exist — non-null assertion is safe
+    const [lng, lat] = station.location!.coordinates;
 
     const raw      = await this.fetchCurrentFromOWM(lat, lng);
     const current  = this.buildWeatherData(stationId, raw);
@@ -329,6 +330,11 @@ class WeatherService {
    * Cache-first strategy identical to getCurrentWeather().
    */
   async getForecast(stationId: string): Promise<ForecastSlot[]> {
+    // Validate early — new Types.ObjectId() below would throw BSONError for bad IDs
+    if (!Types.ObjectId.isValid(stationId)) {
+      throw ApiError.notFound('Station not found');
+    }
+
     const memHit = cacheGet<ForecastSlot[]>(cacheKey.forecast(stationId));
     if (memHit) return memHit;
 
@@ -345,8 +351,8 @@ class WeatherService {
     }
 
     const station = await this.resolveStation(stationId);
-    if (!station.location) throw ApiError.badRequest('Station has no location data');
-    const [lng, lat] = station.location.coordinates;
+    // resolveStation guarantees location.coordinates exist — non-null assertion is safe
+    const [lng, lat] = station.location!.coordinates;
 
     const rawForecast = await this.fetchForecastFromOWM(lat, lng);
     const forecast    = rawForecast.list.map((item) => this.buildForecastSlot(item));

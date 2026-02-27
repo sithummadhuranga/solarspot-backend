@@ -24,6 +24,7 @@ import { Role }   from '@modules/permissions/role.model';
 // ── Mock WeatherService (isolate from Station model dependency) ───────────────
 
 jest.mock('@modules/weather/weather.service', () => ({
+  __esModule: true,
   default: {
     getCurrentWeather: jest.fn(),
     getForecast:       jest.fn(),
@@ -120,9 +121,36 @@ beforeAll(async () => {
     isBanned:        false,
   });
 
-  // Sign JWTs directly — we bypass the login flow to keep tests fast and isolated
-  adminToken   = jwt.sign({ id: adminUser._id.toString() }, jwtSecret, { expiresIn: '15m' });
-  regularToken = jwt.sign({ id: regularUser._id.toString() }, jwtSecret, { expiresIn: '15m' });
+  // Sign JWTs with the full payload the protect + checkPermission middlewares expect.
+  // Include roleLevel explicitly: admin=4 (triggers admin bypass in PermissionEngine),
+  // regular user=1 (falls through to role-based permission check → denied).
+  adminToken = jwt.sign(
+    {
+      _id:             (adminUser._id as import('mongoose').Types.ObjectId).toString(),
+      email:           adminUser.email,
+      role:            (adminRole._id as import('mongoose').Types.ObjectId).toString(),
+      roleLevel:       4,
+      isEmailVerified: true,
+      isActive:        true,
+      isBanned:        false,
+    },
+    jwtSecret,
+    { expiresIn: '15m' },
+  );
+
+  regularToken = jwt.sign(
+    {
+      _id:             (regularUser._id as import('mongoose').Types.ObjectId).toString(),
+      email:           regularUser.email,
+      role:            (userRole._id as import('mongoose').Types.ObjectId).toString(),
+      roleLevel:       1,
+      isEmailVerified: true,
+      isActive:        true,
+      isBanned:        false,
+    },
+    jwtSecret,
+    { expiresIn: '15m' },
+  );
 });
 
 afterAll(async () => {

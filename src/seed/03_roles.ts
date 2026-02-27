@@ -41,7 +41,7 @@ export async function seedRoles(session: ClientSession): Promise<void> {
   const ops = ROLES_SEED.map(r => ({
     updateOne: {
       filter: { name: r.name },
-      update: { $set: r },
+      update: { $set: { ...r, isActive: true } },
       upsert: true,
     },
   }));

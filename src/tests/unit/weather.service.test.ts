@@ -520,4 +520,209 @@ describe('WeatherService.exportWeatherData', () => {
       expect.objectContaining({ stationId: expect.anything() }),
     );
   });
+
+  it('applies both from and to date filters when provided', async () => {
+    mockCache.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) } as never);
+
+    await WeatherService.exportWeatherData({ format: 'json', from: '2026-01-01', to: '2026-02-01' });
+
+    expect(mockCache.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fetchedAt: expect.objectContaining({ $gte: expect.any(Date), $lte: expect.any(Date) }),
+      }),
+    );
+  });
+
+  it('applies only a "from" filter when "to" is omitted', async () => {
+    mockCache.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) } as never);
+
+    await WeatherService.exportWeatherData({ format: 'json', from: '2026-01-01' });
+
+    expect(mockCache.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fetchedAt: expect.objectContaining({ $gte: expect.any(Date) }),
+      }),
+    );
+  });
+});
+
+// ── Branch gap coverage ────────────────────────────────────────────────────────
+
+describe('WeatherService - branch coverage', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();   // un-spy getForecast/getCurrentWeather set by getBestTimes tests
+    jest.clearAllMocks();
+    mockQuota.check.mockResolvedValue(true);
+    mockQuota.increment.mockResolvedValue(undefined);
+  });
+
+  // Line 149 / 339 — early ObjectId guard in getCurrentWeather and getForecast
+  it('throws 404 when stationId is not a valid ObjectId (getCurrentWeather)', async () => {
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+
+    await expect(WeatherService.getCurrentWeather('not-a-valid-id')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(mockStation.findById).not.toHaveBeenCalled();
+  });
+
+  it('throws 404 when stationId is not a valid ObjectId (getForecast)', async () => {
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+
+    await expect(WeatherService.getForecast('not-a-valid-id')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(mockStation.findById).not.toHaveBeenCalled();
+  });
+
+  // deriveSolarIndex → 'excellent' (uvi >= 6 && clouds <= 20)
+  it('returns solarIndex "excellent" when UV ≥ 6 and cloud cover ≤ 20%', async () => {
+    const clearSky = { ...mockOWMCurrentResponse, uvi: 7.5, clouds: { all: 10 } };
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
+    mockAxios.get
+      .mockResolvedValueOnce({ data: clearSky } as never)
+      .mockResolvedValueOnce({ data: mockOWMForecastResponse } as never);
+    mockCache.findOneAndUpdate.mockResolvedValue({} as never);
+
+    const result = await WeatherService.getCurrentWeather(stationId);
+    expect(result.solarIndex).toBe('excellent');
+  });
+
+  // deriveSolarIndex → 'moderate' (uvi >= 2 && clouds <= 60, not excellent/good)
+  it('returns solarIndex "moderate" when UV is 3 and cloud cover is 50%', async () => {
+    const partlyCloudy = { ...mockOWMCurrentResponse, uvi: 3, clouds: { all: 50 } };
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
+    mockAxios.get
+      .mockResolvedValueOnce({ data: partlyCloudy } as never)
+      .mockResolvedValueOnce({ data: mockOWMForecastResponse } as never);
+    mockCache.findOneAndUpdate.mockResolvedValue({} as never);
+
+    const result = await WeatherService.getCurrentWeather(stationId);
+    expect(result.solarIndex).toBe('moderate');
+  });
+
+  // buildWeatherData: raw.uvi absent → falls back to estimateUvIndex
+  it('estimates UV index from cloud cover and time when OWM omits uvi', async () => {
+    // Deliberately omit the uvi field — OWM free tier often doesn't include it
+    const { uvi: _omitted, ...noUvi } = mockOWMCurrentResponse;
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
+    mockAxios.get
+      .mockResolvedValueOnce({ data: noUvi } as never)
+      .mockResolvedValueOnce({ data: mockOWMForecastResponse } as never);
+    mockCache.findOneAndUpdate.mockResolvedValue({} as never);
+
+    const result = await WeatherService.getCurrentWeather(stationId);
+    expect(typeof result.uvIndex).toBe('number');
+    expect(result.solarIndex).toBeTruthy();
+  });
+
+  // deriveSolarIndex → 'unavailable' (uvi=0, clouds>=80)
+  it('returns solarIndex "unavailable" when OWM reports UV=0 and cloud cover ≥ 80%', async () => {
+    const overcastNight = {
+      main:    { temp: 24.0, humidity: 92 },
+      clouds:  { all: 90 },
+      weather: [{ description: 'overcast clouds', icon: '04n' }],
+      wind:    { speed: 1.5 },
+      uvi:     0,
+    };
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
+    mockAxios.get
+      .mockResolvedValueOnce({ data: overcastNight } as never)
+      .mockResolvedValueOnce({ data: mockOWMForecastResponse } as never);
+    mockCache.findOneAndUpdate.mockResolvedValue({} as never);
+
+    const result = await WeatherService.getCurrentWeather(stationId);
+
+    expect(result.solarIndex).toBe('unavailable');
+    expect(result.uvIndex).toBe(0);
+  });
+
+  // Line 194 — fetchForecastFromOWM quota exhausted (getForecast path)
+  it('throws when forecast quota is exhausted during getForecast', async () => {
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
+    mockQuota.check.mockResolvedValue(false);   // forecast quota check fails
+
+    await expect(WeatherService.getForecast(stationId)).rejects.toMatchObject({
+      statusCode: 500,
+      message:    expect.stringContaining('quota'),
+    });
+    expect(mockAxios.get).not.toHaveBeenCalled();
+  });
+
+  // Line 319 — logger.warn catch block: forecast sub-fetch fails inside getCurrentWeather
+  it('still returns current weather and logs a warning when forecast sub-fetch fails', async () => {
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
+    mockCache.findOneAndUpdate.mockResolvedValue({} as never);
+
+    // First quota check (current) passes; second (forecast sub-fetch) fails → caught silently
+    mockQuota.check
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    mockAxios.get.mockResolvedValueOnce({ data: mockOWMCurrentResponse } as never);
+
+    const result = await WeatherService.getCurrentWeather(stationId);
+
+    expect(result.temperature).toBe(29.5);
+    expect(result.solarIndex).toBeTruthy();
+    // persistToCache still called despite empty forecast array
+    expect(mockCache.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  // Lines 340-343 — getForecast DB warm-cache hit
+  it('returns forecast from DB cache when in-memory is cold but DB entry is still valid', async () => {
+    const cachedForecast = [
+      { timestamp: new Date(), temperature: 27, cloudCover: 20, uvIndex: 5, solarIndex: 'good', precipitation: 0.5 },
+    ];
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({
+        forecast:  cachedForecast,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 20),  // expires in 20 min
+      }),
+    } as never);
+
+    const result = await WeatherService.getForecast(stationId);
+
+    expect(result).toEqual(cachedForecast);
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      expect.stringContaining(stationId),
+      cachedForecast,
+      expect.any(Number),
+    );
+    expect(mockAxios.get).not.toHaveBeenCalled();
+  });
+
+  // Lines 358 + 364 — getForecast: both forecast AND current fetches succeed → persistToCache
+  it('persists both current and forecast when both OWM calls succeed inside getForecast', async () => {
+    mockCacheGet.mockReturnValue(undefined);
+    mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
+    mockCache.findOneAndUpdate.mockResolvedValue({} as never);
+
+    // forecast fetch first, then current sub-fetch — both succeed
+    mockAxios.get
+      .mockResolvedValueOnce({ data: mockOWMForecastResponse } as never)
+      .mockResolvedValueOnce({ data: mockOWMCurrentResponse } as never);
+
+    const result = await WeatherService.getForecast(stationId);
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(8);
+    // persistToCache (findOneAndUpdate) must have been called since current was defined
+    expect(mockCache.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
 });

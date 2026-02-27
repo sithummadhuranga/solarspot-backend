@@ -43,7 +43,7 @@ router.delete('/admin/users/:id/permissions/:permId',
   protect, checkPermission('permissions.manage'), PC.removeUserPermissionOverride);
 
 // ─── Client-side permission gate ──────────────────────────────────────────────
-router.post('/permissions/check',
+router.post('/check',
   protect, validate(V.checkPermSchema), PC.checkPermission);
 
 // ─── Audit logs ───────────────────────────────────────────────────────────────

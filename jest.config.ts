@@ -17,9 +17,10 @@ const config: Config = {
     global: { lines: 0, functions: 0, branches: 0 },
     // ── Member 1 — Stations (80%+ per §9.1) ──────────────────────────────
     './src/modules/stations/station.service.ts': { lines: 80, functions: 80, branches: 70 },
-    // ── Members 2–4 add their entries below when implementing their tests ─
+    // ── Member 3 — Weather Intelligence (80%+ per §9.1) ──────────────────
+    './src/modules/weather/weather.service.ts':  { lines: 80, functions: 80, branches: 70 },
+    // ── Members 2/4 add their entries below when implementing their tests ─
     // './src/modules/reviews/review.service.ts':  { lines: 80, functions: 80, branches: 70 },
-    // './src/modules/weather/weather.service.ts':  { lines: 80, functions: 80, branches: 70 },
     // './src/modules/auth/auth.service.ts':        { lines: 80, functions: 80, branches: 70 },
     // './src/modules/users/user.service.ts':       { lines: 80, functions: 80, branches: 70 },
   },
