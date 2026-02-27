@@ -20,21 +20,22 @@ interface RoleSeed {
   displayName: string;
   roleLevel: number;
   isSystem: boolean;
+  isActive: boolean;
 }
 
 // ─── Seed data — 10 roles ────────────────────────────────────────────────────
 // Ref: PROJECT_OVERVIEW.md → Roles
 export const ROLES_SEED: RoleSeed[] = [
-  { name: 'guest',                displayName: 'Visitor',              roleLevel: 0, isSystem: true  },
-  { name: 'user',                 displayName: 'Member',               roleLevel: 1, isSystem: true  },
-  { name: 'station_owner',        displayName: 'Station Owner',        roleLevel: 2, isSystem: false },
-  { name: 'featured_contributor', displayName: 'Featured Contributor', roleLevel: 2, isSystem: false },
-  { name: 'trusted_reviewer',     displayName: 'Trusted Reviewer',     roleLevel: 2, isSystem: false },
-  { name: 'review_moderator',     displayName: 'Review Moderator',     roleLevel: 3, isSystem: false },
-  { name: 'weather_analyst',      displayName: 'Weather Analyst',      roleLevel: 3, isSystem: false },
-  { name: 'permission_auditor',   displayName: 'Permission Auditor',   roleLevel: 3, isSystem: false },
-  { name: 'moderator',            displayName: 'Moderator',            roleLevel: 3, isSystem: true  },
-  { name: 'admin',                displayName: 'Administrator',        roleLevel: 4, isSystem: true  },
+  { name: 'guest',                displayName: 'Visitor',              roleLevel: 0, isSystem: true,  isActive: true },
+  { name: 'user',                 displayName: 'Member',               roleLevel: 1, isSystem: true,  isActive: true },
+  { name: 'station_owner',        displayName: 'Station Owner',        roleLevel: 2, isSystem: false, isActive: true },
+  { name: 'featured_contributor', displayName: 'Featured Contributor', roleLevel: 2, isSystem: false, isActive: true },
+  { name: 'trusted_reviewer',     displayName: 'Trusted Reviewer',     roleLevel: 2, isSystem: false, isActive: true },
+  { name: 'review_moderator',     displayName: 'Review Moderator',     roleLevel: 3, isSystem: false, isActive: true },
+  { name: 'weather_analyst',      displayName: 'Weather Analyst',      roleLevel: 3, isSystem: false, isActive: true },
+  { name: 'permission_auditor',   displayName: 'Permission Auditor',   roleLevel: 3, isSystem: false, isActive: true },
+  { name: 'moderator',            displayName: 'Moderator',            roleLevel: 3, isSystem: true,  isActive: true },
+  { name: 'admin',                displayName: 'Administrator',        roleLevel: 4, isSystem: true,  isActive: true },
 ];
 
 export async function seedRoles(session: ClientSession): Promise<void> {
