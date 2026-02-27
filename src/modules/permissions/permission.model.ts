@@ -33,7 +33,7 @@ const permissionSchema = new Schema<IPermission>(
   { timestamps: true },
 );
 
-permissionSchema.index({ action: 1 }, { unique: true });
+// action index already created by `unique: true` on the field — only add non-duplicate indexes
 permissionSchema.index({ resource: 1 });
 permissionSchema.index({ component: 1 });
 

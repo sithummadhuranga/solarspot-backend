@@ -14,8 +14,8 @@ let adminToken: string;
 let regularToken: string;
 let targetUserId: string;
 
-const ADM = { displayName: 'Perm Admin',   email: `padm-${Date.now()}@test.example`, password: 'Admin123!' };
-const REG = { displayName: 'Perm Regular', email: `preg-${Date.now()}@test.example`, password: 'Regular1!' };
+const ADM = { displayName: 'Perm Admin',   email: `padm-${Date.now()}@test.com`, password: 'Admin123!' };
+const REG = { displayName: 'Perm Regular', email: `preg-${Date.now()}@test.com`, password: 'Regular1!' };
 
 async function registerAndLogin(p: typeof ADM): Promise<{ token: string; userId: string }> {
   await request(app).post('/api/auth/register').send(p);

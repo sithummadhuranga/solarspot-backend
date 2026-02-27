@@ -1,10 +1,10 @@
 import request from 'supertest';
 import mongoose, { Types } from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import jwt from 'jsonwebtoken';
 
 import app from '../../../app';
 import { Station } from '@modules/stations/station.model';
+import { connectTestDb, disconnectTestDb, seedCore } from './helpers';
 
 jest.mock('@utils/geocoder', () => ({
   forwardGeocode: jest.fn().mockResolvedValue(null),
@@ -34,7 +34,6 @@ const userToken      = signToken({ _id: USER_ID.toString(),       role: 'user' }
 const _otherUserToken = signToken({ _id: OTHER_USER_ID.toString(), role: 'user', email: 'other@test.com' });
 const modToken       = signToken({ _id: MODERATOR_ID.toString(),  role: 'moderator' });
 
-let mongoServer:       MongoMemoryServer;
 let activeStationId:   string;
 let pendingStationId:  string;
 let featureStationId:  string;
@@ -42,8 +41,8 @@ let deleteStationId:   string;
 let otherStationId:    string;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri(), { dbName: 'solarspot_test' });
+  await connectTestDb();
+  await seedCore();
   await Station.init();
   const [s1, s2, s3, s4, s5] = await Station.insertMany([
     {
@@ -101,9 +100,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await disconnectTestDb();
 });
 
 describe('GET /api/stations', () => {
