@@ -46,7 +46,11 @@ class NodemailerTransport implements IMailTransport {
 class PreviewTransport implements IMailTransport {
   async sendMail(options: nodemailer.SendMailOptions): Promise<void> {
     logger.info(`[EmailPreview] To: ${options.to} | Subject: ${options.subject}`);
-    logger.debug(`[EmailPreview] Body: ${String(options.html).substring(0, 200)}...`);
+    // Extract all URLs from the HTML body so tokens are always visible
+    const html = String(options.html);
+    const urls = html.match(/https?:\/\/[^\s"'<>]+/g) ?? [];
+    urls.forEach(url => logger.info(`[EmailPreview] URL: ${url}`));
+    logger.debug(`[EmailPreview] Body: ${html.substring(0, 500)}...`);
   }
 }
 
