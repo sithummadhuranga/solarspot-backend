@@ -25,7 +25,7 @@ docker-compose up -d
 
 | Service     | URL                            |
 |-------------|-------------------------------|
-| API         | http://localhost:5001          |
+| API         | http://localhost:5000          |
 | Mongo UI    | http://localhost:8081          |
 | MongoDB     | mongodb://localhost:27017      |
 
@@ -36,7 +36,7 @@ docker-compose up -d
 In your **frontend** project set the API base URL to:
 
 ```
-http://localhost:5001/api
+http://localhost:5000/api
 ```
 
 In **this** `.env`, make sure `FRONTEND_URL` matches your frontend dev server (used for CORS):

@@ -11,7 +11,7 @@ services:
       - ./server.ts:/app/server.ts
       - /app/node_modules
     ports:
-      - "5001:5000"
+      - "5000:5000"
     env_file:
       - .env
     environment:

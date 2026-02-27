@@ -8,12 +8,12 @@ The server runs inside Docker. If it's not already running:
 docker compose up -d
 ```
 
-> Port 5000 may be blocked by macOS AirPlay. The Docker compose maps to **5001** on your host.
+> Docker compose maps the API to **5000** on your host.
 > Verify: `docker ps` — you should see `solarspot_backend` running.
 
 **Health check:**
 ```bash
-curl http://localhost:5001/api/health
+curl http://localhost:5000/api/health
 ```
 
 ---
@@ -41,7 +41,7 @@ Create a Postman Environment called `SolarSpot Dev` with these variables:
 
 | Variable | Value |
 |---|---|
-| `base_url` | `http://localhost:5001/api` |
+| `base_url` | `http://localhost:5000/api` |
 | `admin_token` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5YTA2Zjk5YTA2ZDdiYjNiYzU0NTJmMCIsImlhdCI6MTc3MjEyMjAxMCwiZXhwIjoxNzcyNzI2ODEwfQ.HsY_JAsku9TTsTfmEUQoiOig0J6ZsxQbHZu9nOKGrqQ` |
 | `mod_token` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5YTA2Zjk5YTA2ZDdiYjNiYzU0NTJmMyIsImlhdCI6MTc3MjEyMjAxMCwiZXhwIjoxNzcyNzI2ODEwfQ.qBfPOQaDtJORX9UrxYQnZg6mMuuT7RejXoTchXOJAZ8` |
 | `owner_token` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5YTA2ZjlhYTA2ZDdiYjNiYzU0NTJmNiIsImlhdCI6MTc3MjEyMjAxMCwiZXhwIjoxNzcyNzI2ODEwfQ.Mn5w-cNMsSL23DMk-Wj0DtMABLYtIwPUYV6rsfBsUa4` |
