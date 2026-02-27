@@ -1,4 +1,4 @@
-import { Schema, model, Document, Types } from 'mongoose';
+import { Schema, model, Document } from 'mongoose';
 import type { IStation, IConnector, IScheduleEntry, IOperatingHours, IStationAddress } from '@/types';
 
 export const CONNECTOR_TYPES = ['USB-C', 'Type-2', 'CCS', 'CHAdeMO', 'Tesla-NACS', 'AC-Socket'] as const;

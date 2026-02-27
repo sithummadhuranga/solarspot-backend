@@ -13,23 +13,6 @@ export const ROLES = {
 
 export type RoleName = keyof typeof ROLES;
 
-const PERMISSIONS: Record<string, RoleName[]> = {
-  'stations:create':      ['user', 'moderator', 'admin'],
-  'stations:update':      ['user', 'moderator', 'admin'],  
-  'stations:approve':     ['moderator', 'admin'],
-  'stations:reject':      ['moderator', 'admin'],
-  'stations:viewPending': ['moderator', 'admin'],
-  'stations:delete':      ['admin'],
-  'stations:feature':     ['moderator', 'admin'],
-  'stations:viewStats':   ['user', 'moderator', 'admin'],
-
-  'reviews:create':   ['user', 'moderator', 'admin'],
-  'reviews:moderate': ['moderator', 'admin'],
-
-  // ── Users ──────────────────────────────────────────────────────────────────
-  'users:manage': ['admin'],
-};
-
 /**
  * checkPermission — RBAC + PBAC middleware factory.
  * Uses PermissionEngine.evaluate() to check role permissions and all attached policies.

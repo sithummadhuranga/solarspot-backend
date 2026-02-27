@@ -382,7 +382,7 @@ export async function seedDemoStations(session: ClientSession): Promise<void> {
   for (const station of DEMO_STATIONS) {
     const submittedBy = userIdByEmail.get(station.submittedByEmail);
     if (!submittedBy) {
-      logger.warn(`⚠️  seedDemoStations: submitter \"${station.submittedByEmail}\" not found — skipping ${station.name}`);
+      logger.warn(`⚠️  seedDemoStations: submitter "${station.submittedByEmail}" not found — skipping ${station.name}`);
       continue;
     }
 
@@ -391,7 +391,7 @@ export async function seedDemoStations(session: ClientSession): Promise<void> {
       : null;
 
     if (station.verifiedByEmail && !verifiedBy) {
-      logger.warn(`⚠️  seedDemoStations: verifier \"${station.verifiedByEmail}\" not found — skipping ${station.name}`);
+      logger.warn(`⚠️  seedDemoStations: verifier "${station.verifiedByEmail}" not found — skipping ${station.name}`);
       continue;
     }
 

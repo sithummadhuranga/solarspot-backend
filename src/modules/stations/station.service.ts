@@ -1,4 +1,4 @@
-import mongoose, { Types, PipelineStage } from 'mongoose';
+import { Types, PipelineStage } from 'mongoose';
 import { Station } from './station.model';
 import '@modules/users/user.model';
 import type { IStation, ListStationsQuery, NearbyStationsQuery, CreateStationInput, UpdateStationInput } from '@/types';
@@ -131,7 +131,9 @@ export async function createStation(input: CreateStationInput & { submittedBy: s
     try {
       const geo = await reverseGeocode(inputLat, inputLng);
       if (geo) addressParts = { street: geo.street, city: geo.city, district: geo.district, country: geo.country, postalCode: geo.postalCode, formattedAddress: geo.formattedAddress };
-    } catch {}
+    } catch {
+      logger.warn(`[stations] Reverse geocoding failed for coordinates (${inputLat}, ${inputLng})`);
+    }
   }
 
   const station = await Station.create({
@@ -182,7 +184,9 @@ export async function updateStation(id: string, input: UpdateStationInput, reque
     try {
       const geo = await reverseGeocode(inputLat, inputLng);
       if (geo) station.address = { street: geo.street, city: geo.city, district: geo.district, country: geo.country, postalCode: geo.postalCode, formattedAddress: geo.formattedAddress };
-    } catch {}
+    } catch {
+      logger.warn(`[stations] Reverse geocoding failed for station update (${station._id})`);
+    }
   }
 
   await station.save();

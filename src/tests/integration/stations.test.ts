@@ -31,7 +31,7 @@ function signToken(payload: {
 }
 
 const userToken      = signToken({ _id: USER_ID.toString(),       role: 'user' });
-const otherUserToken = signToken({ _id: OTHER_USER_ID.toString(), role: 'user', email: 'other@test.com' });
+const _otherUserToken = signToken({ _id: OTHER_USER_ID.toString(), role: 'user', email: 'other@test.com' });
 const modToken       = signToken({ _id: MODERATOR_ID.toString(),  role: 'moderator' });
 
 let mongoServer:       MongoMemoryServer;
