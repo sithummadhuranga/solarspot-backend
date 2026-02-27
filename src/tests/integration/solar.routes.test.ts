@@ -114,7 +114,7 @@ const fakePaginatedReports = {
 
 // ── Shared tokens ─────────────────────────────────────────────────────────────
 
-let adminToken:   string;
+let _adminToken:  string;
 let regularToken: string;
 let userId:       string;
 
@@ -154,7 +154,7 @@ beforeAll(async () => {
 
   userId = (regularUser._id as Types.ObjectId).toString();
 
-  adminToken = jwt.sign(
+  _adminToken = jwt.sign(
     {
       _id:             (adminUser._id as Types.ObjectId).toString(),
       email:           adminUser.email,
