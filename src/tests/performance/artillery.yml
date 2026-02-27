@@ -1,0 +1,134 @@
+# ─── SolarSpot API — Artillery Performance Test ───────────────────────────────
+# Spec:  Testing Strategy §9.3
+# Target: deployed Render backend URL (run AFTER deployment, NOT locally)
+#
+# Usage:
+#   npm run test:perf             → runs the test and writes report.json
+#   npm run test:perf:report      → converts report.json to HTML
+#
+#   Or manually:
+#   npx artillery run src/tests/performance/artillery.yml --output report.json
+#   npx artillery report report.json
+#
+# SLA thresholds (§9.3):
+#   p95 latency < 500 ms
+#   error rate  < 1 %
+# ──────────────────────────────────────────────────────────────────────────────
+
+config:
+  # ── Deployment target: update to your Render service URL before running ──
+  target: "https://solarspot-backend.onrender.com"
+
+  # ── Load phases ──────────────────────────────────────────────────────────
+  phases:
+    - name:        "Warm-up"
+      duration:    30
+      arrivalRate: 5
+
+    - name:        "Ramp-up"
+      duration:    60
+      arrivalRate: 5
+      rampTo:      50
+
+    - name:        "Sustained load"
+      duration:    120
+      arrivalRate: 50
+
+    - name:        "Ramp-down"
+      duration:    30
+      arrivalRate: 50
+      rampTo:      0
+
+  defaults:
+    headers:
+      Content-Type:  "application/json"
+      Accept:        "application/json"
+
+  # ── Shared variables ─────────────────────────────────────────────────────
+  variables:
+    # Replace with a real seeded stationId from your deployed database
+    stationId:     "000000000000000000000001"
+    loginEmail:    "user@solarspot.dev"
+    loginPassword: "User@123456"
+
+# ── Scenarios (weighted) ──────────────────────────────────────────────────────
+# Distribution matching §9.3:
+#   60% → GET /api/stations (list + filters)
+#   20% → GET /api/stations/nearby
+#   10% → GET /api/weather/station/:id/current
+#   10% → POST /api/auth/login
+
+scenarios:
+  # ── 60 % — Station listing with common filter combinations ───────────────
+  - name:   "List stations — no filters"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/stations"
+          expect:
+            - statusCode: 200
+
+  - name:   "List stations — filtered by connector type"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/stations?connectorType=Type-2&sortBy=rating"
+          expect:
+            - statusCode: 200
+
+  - name:   "List stations — filtered by location radius"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/stations?lat=6.9&lng=79.8&radius=25"
+          expect:
+            - statusCode: 200
+
+  # ── 20 % — Nearby stations (geo query) ───────────────────────────────────
+  - name:   "Nearby stations — Colombo"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/stations/nearby?lat=6.9&lng=79.8&radius=10"
+          expect:
+            - statusCode: 200
+
+  - name:   "Nearby stations — Kandy"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/stations/nearby?lat=7.2906&lng=80.6337&radius=10"
+          expect:
+            - statusCode: 200
+
+  # ── 10 % — Weather for a station ─────────────────────────────────────────
+  - name:   "Current weather for station"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/weather/station/{{ stationId }}/current"
+          # Weather may return 404 for the placeholder stationId — acceptable
+          expect:
+            - statusCode:
+                - 200
+                - 404
+
+  # ── 10 % — Auth login ─────────────────────────────────────────────────────
+  - name:   "Auth — login"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email:    "{{ loginEmail }}"
+            password: "{{ loginPassword }}"
+          # Login might fail if the seed user doesn't exist on the server
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+# ── SLA thresholds (enforced by --bail flag) ──────────────────────────────────
+ensure:
+  p95:          500    # ms  — §9.3: p95 latency < 500 ms
+  maxErrorRate: 1      # %   — §9.3: error rate < 1 %

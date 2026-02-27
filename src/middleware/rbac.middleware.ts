@@ -4,13 +4,22 @@ import { container } from '@/container';
 import ApiError from '@utils/ApiError';
 import { PermissionAction } from '@/types';
 
+/** Role hierarchy — higher number = more permissions */
+export const ROLES = {
+  user: 1,
+  moderator: 2,
+  admin: 3,
+} as const;
+
+export type RoleName = keyof typeof ROLES;
+
 /**
  * checkPermission — RBAC + PBAC middleware factory.
- * Uses PermissionEngine.evaluate() to check role permissions and All attached policies.
+ * Uses PermissionEngine.evaluate() to check role permissions and all attached policies.
  *
- * @param action — e.g. 'stations.create', 'reviews.moderate'
+ * @param action — e.g. 'stations:approve', 'reviews:moderate'
  *
- * Usage: router.post('/', protect, checkPermission('stations.create'), validate(...), controller)
+ * Usage: router.post('/', protect, checkPermission('stations:create'), validate(...), controller)
  */
 export const checkPermission =
   (action: PermissionAction) =>
@@ -22,10 +31,10 @@ export const checkPermission =
     const user = {
       _id: req.user._id as unknown as import('mongoose').Types.ObjectId,
       role: req.user.role,
-      roleLevel: req.user.roleLevel,
+      roleLevel: req.user.roleLevel ?? ROLES[req.user.role as RoleName] ?? 1,
       isEmailVerified: req.user.isEmailVerified,
-      isActive: req.user.isActive,
-      isBanned: req.user.isBanned,
+      isActive: req.user.isActive ?? true,
+      isBanned: req.user.isBanned ?? false,
     };
 
     // Resource document for owner_match and field_equals policies

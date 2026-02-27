@@ -1,83 +1,97 @@
-/**
- * Station model — Mongoose schema with discriminator pattern.
- *
- * TODO: Member 1 — implement fields, 2dsphere index, discriminator sub-schemas.
- *
- * Ref: PROJECT_OVERVIEW.md → Data Models → Station (~35 fields listed)
- *      MASTER_PROMPT.md → Discriminator Pattern for station types
- *      MASTER_PROMPT.md → ACID — 2dsphere index required for geospatial queries
- */
-
 import { Schema, model, Document } from 'mongoose';
-import type { IStation } from '@/types';
+import type { IStation, IConnector, IScheduleEntry, IOperatingHours, IStationAddress } from '@/types';
+
+export const CONNECTOR_TYPES = ['USB-C', 'Type-2', 'CCS', 'CHAdeMO', 'Tesla-NACS', 'AC-Socket'] as const;
+export const AMENITY_VALUES  = ['wifi', 'cafe', 'restroom', 'parking', 'security', 'shade', 'water', 'repair_shop', 'ev_parking'] as const;
+export const DAYS_OF_WEEK    = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+const ConnectorSchema = new Schema<IConnector>(
+  {
+    type:    { type: String, enum: CONNECTOR_TYPES, required: true },
+    powerKw: { type: Number, required: true, min: 0.5, max: 350 },
+    count:   { type: Number, required: true, min: 1 },
+  },
+  { _id: false },
+);
+
+const ScheduleEntrySchema = new Schema<IScheduleEntry>(
+  {
+    day:       { type: String, enum: DAYS_OF_WEEK, required: true },
+    openTime:  { type: String, required: true, match: /^\d{2}:\d{2}$/ },
+    closeTime: { type: String, required: true, match: /^\d{2}:\d{2}$/ },
+  },
+  { _id: false },
+);
+
+const OperatingHoursSchema = new Schema<IOperatingHours>(
+  {
+    alwaysOpen: { type: Boolean, default: false },
+    schedule:   { type: [ScheduleEntrySchema], default: [] },
+  },
+  { _id: false },
+);
+
+const AddressSchema = new Schema<IStationAddress>(
+  {
+    street:           { type: String, default: null },
+    city:             { type: String, default: null },
+    district:         { type: String, default: null },
+    country:          { type: String, default: null },
+    postalCode:       { type: String, default: null },
+    formattedAddress: { type: String, default: null },
+  },
+  { _id: false },
+);
 
 const stationSchema = new Schema<IStation & Document>(
   {
-    // ── Core ──────────────────────────────────────────────────────────────
-    // name:            { type: String, required: true, trim: true, maxlength: 120 },
-    // description:     { type: String, trim: true, maxlength: 1000 },
-    // type:            { type: String, enum: ['charging', 'solar_panel'], required: true },
-    // status:          { type: String, enum: ['active','inactive','maintenance','pending_review'], default: 'pending_review' },
-    // owner:           { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    name:        { type: String, required: true, trim: true, minlength: 3, maxlength: 100 },
+    description: { type: String, trim: true, maxlength: 1000 },
 
-    // ── Location ─────────────────────────────────────────────────────────
-    // location: {
-    //   type:        { type: String, enum: ['Point'], default: 'Point' },
-    //   coordinates: { type: [Number], required: true },  // [lng, lat]
-    // },
-    // address: {
-    //   street:  String,
-    //   city:    String,
-    //   state:   String,
-    //   country: String,
-    //   zip:     String,
-    // },
+    location: {
+      type:        { type: String, enum: ['Point'] },
+      coordinates: { type: [Number] },
+    },
+    geocodePending: { type: Boolean, default: false, index: true },
+    address:        { type: AddressSchema, default: {} },
 
-    // ── Media ─────────────────────────────────────────────────────────────
-    // images:  [{ type: String }],   // Cloudinary URLs
-    // thumbnail: String,
+    submittedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
 
-    // ── Ratings (maintained by review post-save hook) ──────────────────
-    // averageRating: { type: Number, default: 0, min: 0, max: 5 },
-    // reviewCount:   { type: Number, default: 0 },
+    connectors: {
+      type: [ConnectorSchema],
+      required: true,
+      validate: { validator: (v: IConnector[]) => v.length >= 1, message: 'At least one connector required' },
+    },
+    solarPanelKw: { type: Number, required: true, min: 0.1, max: 10000 },
+    amenities:    { type: [String], enum: AMENITY_VALUES as unknown as string[], default: [] },
+    images:       { type: [String], default: [], validate: { validator: (v: string[]) => v.length <= 5, message: 'Max 5 images' } },
+    operatingHours: { type: OperatingHoursSchema, default: {} },
 
-    // ── Discriminator key ────────────────────────────────────────────────
-    // stationType: { type: String, required: true },  // discriminator key
+    status:          { type: String, enum: ['pending', 'active', 'inactive', 'rejected'], default: 'pending', index: true },
+    isVerified:      { type: Boolean, default: false, index: true },
+    verifiedBy:      { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    verifiedAt:      { type: Date, default: null },
+    rejectionReason: { type: String, default: null, maxlength: 500 },
 
-    // ── Soft delete ──────────────────────────────────────────────────────
-    // isDeleted:   { type: Boolean, default: false },
-    // deletedAt:   Date,
+    isFeatured:    { type: Boolean, default: false, index: true },
+    averageRating: { type: Number, default: 0, min: 0, max: 5, index: true },
+    reviewCount:   { type: Number, default: 0, min: 0 },
+
+    isActive:  { type: Boolean, default: true, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
-  { timestamps: true, discriminatorKey: 'stationType' },
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } },
 );
 
-// ── Indexes ──────────────────────────────────────────────────────────────────
-// TODO: Member 1 — 2dsphere required for $near/$geoWithin queries
-// stationSchema.index({ location: '2dsphere' });
-// stationSchema.index({ status: 1 });
-// stationSchema.index({ owner: 1 });
-// stationSchema.index({ type: 1, status: 1 });
-// stationSchema.index({ isDeleted: 1 });
+stationSchema.index({ location: '2dsphere' });
+stationSchema.index(
+  { name: 'text', description: 'text', 'address.city': 'text' },
+  { name: 'station_text_search', weights: { name: 3, 'address.city': 2, description: 1 } },
+);
+stationSchema.index({ status: 1, isActive: 1 });
+stationSchema.index({ isFeatured: 1, averageRating: -1 });
+stationSchema.index({ submittedBy: 1, status: 1 });
 
 export const Station = model<IStation & Document>('Station', stationSchema);
-
-// ── Discriminator models ──────────────────────────────────────────────────────
-// TODO: Member 1 — define ChargingStation and SolarPanel discriminator schemas
-//
-// const chargingStationSchema = new Schema({
-//   connectorTypes:  [{ type: String }], // e.g. ['CCS','CHAdeMO','Type2']
-//   maxPowerKw:      Number,
-//   pricePerKwh:     Number,
-//   availablePorts:  Number,
-//   totalPorts:      Number,
-// });
-//
-// const solarPanelSchema = new Schema({
-//   capacityKw:      Number,
-//   panelCount:      Number,
-//   manufacturer:    String,
-//   installDate:     Date,
-// });
-//
-// export const ChargingStation = Station.discriminator('ChargingStation', chargingStationSchema);
-// export const SolarPanel =      Station.discriminator('SolarPanel',      solarPanelSchema);
+export type { IStation };

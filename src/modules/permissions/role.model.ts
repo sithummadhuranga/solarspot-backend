@@ -38,7 +38,6 @@ const roleSchema = new Schema<IRole>(
   { timestamps: true },
 );
 
-roleSchema.index({ name: 1 }, { unique: true });
 roleSchema.index({ isActive: 1 });
 roleSchema.index({ roleLevel: 1 });
 

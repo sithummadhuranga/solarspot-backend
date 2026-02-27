@@ -10,6 +10,7 @@
     "build": "tsc && tsc-alias",
     "start": "node dist/server.js",
     "dev": "nodemon",
+    "seed:dev": "ts-node -r tsconfig-paths/register src/seed/dev-seed.ts",
     "seed": "ts-node -r tsconfig-paths/register src/seed/runner.ts full",
     "seed:core": "ts-node -r tsconfig-paths/register src/seed/runner.ts core",
     "seed:demo": "ts-node -r tsconfig-paths/register src/seed/runner.ts demo",
@@ -20,6 +21,8 @@
     "test:unit": "jest --config jest.config.ts --testPathPattern=tests/unit --coverage --forceExit",
     "test:integration": "jest --config jest.integration.config.ts --runInBand --forceExit",
     "test:coverage": "jest --config jest.config.ts --coverage --runInBand --forceExit",
+    "test:perf":     "npx artillery run src/tests/performance/artillery.yml --output report.json",
+    "test:perf:report": "npx artillery report report.json",
     "lint": "eslint src app.ts server.ts",
     "format": "prettier --write \"src/**/*.ts\" app.ts server.ts"
   },

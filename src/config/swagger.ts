@@ -16,7 +16,11 @@ const options: swaggerJsdoc.Options = {
     servers: [
       {
         url: 'http://localhost:5000',
-        description: 'Local development server',
+        description: 'Local development (Docker)',
+      },
+      {
+        url: 'http://localhost:5000',
+        description: 'Local development (bare npm run dev)',
       },
       {
         url: 'https://solarspot-api.onrender.com',
@@ -60,6 +64,22 @@ const options: swaggerJsdoc.Options = {
             totalPages: { type: 'integer', example: 10 },
             hasNext: { type: 'boolean', example: true },
             hasPrev: { type: 'boolean', example: false },
+          },
+        },
+      },
+      responses: {
+        ValidationError: {
+          description: 'Request body / query failed validation',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiError' },
+              example: {
+                success: false,
+                message: 'Validation failed',
+                errors: ['name is required', 'solarPanelKw must be a number'],
+                statusCode: 422,
+              },
+            },
           },
         },
       },

@@ -1,21 +1,11 @@
 /**
- * Integration test global setup — starts an in-memory MongoDB REPLICA SET
- * (required for transactions used in register, deleteMe, adminUpdateUser, etc.)
- * Ref: MASTER_PROMPT.md → Testing → Integration tests hit actual Express router + in-memory DB
+ * Integration test globalSetup — runs ONCE before all integration test suites
+ * in a separate Node process (not accessible in test workers).
+ *
+ * Individual test files manage their own MongoMemoryServer connections
+ * in beforeAll / afterAll for full isolation.
  */
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
-
 export default async function globalSetup(): Promise<void> {
-  const mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
-  const uri = mongod.getUri();
-
-  process.env.MONGODB_URI = uri;
-  process.env.MONGODB_DB_NAME = 'solarspot_test';
-  process.env.JWT_SECRET = 'test-jwt-secret-that-is-at-least-64-chars-long-for-compliance-xyz';
-  process.env.COOKIE_SECRET = 'test-cookie-secret-32-chars-min!';
-  process.env.EMAIL_PREVIEW = 'true';
-  process.env.NODE_ENV = 'test';
-
-  // Share instance with teardown via global
-  (global as Record<string, unknown>).__MONGOD__ = mongod;
+  // Nothing to do here — the MongoMemoryServer lifecycle is managed
+  // per-test-file (beforeAll / afterAll) so each suite gets a clean DB.
 }
