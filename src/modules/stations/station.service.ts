@@ -1,5 +1,6 @@
 import mongoose, { Types, PipelineStage } from 'mongoose';
 import { Station } from './station.model';
+import '@modules/users/user.model'; // Ensure User schema is registered for populate
 import type { IStation, ListStationsQuery, NearbyStationsQuery, CreateStationInput, UpdateStationInput } from '@/types';
 import { forwardGeocode, reverseGeocode } from '@utils/geocoder';
 import ApiError from '@utils/ApiError';

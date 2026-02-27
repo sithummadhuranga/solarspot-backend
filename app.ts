@@ -24,7 +24,17 @@ app.use(
 // ─── CORS ──────────────────────────────────────────────────────────────────────
 app.use(
   cors({
-    origin: config.FRONTEND_URL,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      // In development allow any localhost port (Vite picks the next free port)
+      if (config.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+      // In production restrict to FRONTEND_URL
+      if (origin === config.FRONTEND_URL) return callback(null, true);
+      return callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -118,14 +128,15 @@ import authRouter        from '@modules/auth/auth.routes';
 import usersRouter       from '@modules/users/user.routes';
 import permissionsRouter from '@modules/permissions/permission.routes';
 import stationsRouter    from '@modules/stations/station.routes';
-// import reviewsRouter from '@modules/reviews/review.routes';    // Member 2
+import reviewsRouter     from '@modules/reviews/review.routes';
 import weatherRouter     from '@modules/weather/weather.routes';
 
 app.use('/api/auth',        authRouter);
 app.use('/api/users',       usersRouter);
 app.use('/api/stations',    stationsRouter);
+app.use('/api/reviews',     reviewsRouter);
 app.use('/api/weather',     weatherRouter);
-app.use('/api',             permissionsRouter); // routes define their own /admin/* paths
+app.use('/api/permissions', permissionsRouter);
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
