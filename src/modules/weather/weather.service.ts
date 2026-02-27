@@ -303,6 +303,7 @@ class WeatherService {
 
     // Layer 3: live OWM API fetch
     const station = await this.resolveStation(stationId);
+    if (!station.location) throw ApiError.badRequest('Station has no location data');
     const [lng, lat] = station.location.coordinates;
 
     const raw      = await this.fetchCurrentFromOWM(lat, lng);
@@ -344,6 +345,7 @@ class WeatherService {
     }
 
     const station = await this.resolveStation(stationId);
+    if (!station.location) throw ApiError.badRequest('Station has no location data');
     const [lng, lat] = station.location.coordinates;
 
     const rawForecast = await this.fetchForecastFromOWM(lat, lng);

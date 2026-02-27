@@ -48,10 +48,10 @@ export const checkPermission =
     const user = {
       _id: req.user._id as unknown as import('mongoose').Types.ObjectId,
       role: req.user.role,
-      roleLevel: req.user.roleLevel,
+      roleLevel: req.user.roleLevel ?? ROLES[req.user.role as RoleName] ?? 1,
       isEmailVerified: req.user.isEmailVerified,
-      isActive: req.user.isActive,
-      isBanned: req.user.isBanned,
+      isActive: req.user.isActive ?? true,
+      isBanned: req.user.isBanned ?? false,
     };
 
     // Resource document for owner_match and field_equals policies

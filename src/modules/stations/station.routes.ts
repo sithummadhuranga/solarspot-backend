@@ -156,7 +156,7 @@ router.get('/search',  validate(V.searchQuerySchema, 'query'),       StationCont
  */
 router.get('/pending',
   protect,
-  checkPermission('stations:viewPending'),
+  checkPermission('stations.read-pending'),
   StationController.getPendingStations
 );
 
@@ -286,6 +286,7 @@ router.post('/',
  */
 router.put('/:id',
   protect,
+  checkPermission('stations.edit-own'),
   validate(V.updateStationSchema),
   StationController.updateStation
 );
@@ -313,6 +314,7 @@ router.put('/:id',
  */
 router.delete('/:id',
   protect,
+  checkPermission('stations.delete-any'),
   StationController.deleteStation
 );
 
@@ -343,7 +345,7 @@ router.delete('/:id',
  */
 router.patch('/:id/approve',
   protect,
-  checkPermission('stations:approve'),
+  checkPermission('stations.approve'),
   StationController.approveStation
 );
 
@@ -387,7 +389,7 @@ router.patch('/:id/approve',
  */
 router.patch('/:id/reject',
   protect,
-  checkPermission('stations:reject'),
+  checkPermission('stations.reject'),
   validate(V.rejectStationSchema),
   StationController.rejectStation
 );
@@ -419,7 +421,7 @@ router.patch('/:id/reject',
  */
 router.patch('/:id/feature',
   protect,
-  checkPermission('stations:feature'),
+  checkPermission('stations.feature'),
   StationController.featureStation
 );
 
@@ -446,6 +448,7 @@ router.patch('/:id/feature',
  */
 router.get('/:id/stats',
   protect,
+  checkPermission('stations.read'),
   StationController.getStationStats
 );
 
