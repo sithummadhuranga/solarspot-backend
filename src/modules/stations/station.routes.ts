@@ -4,6 +4,8 @@ import { checkPermission } from '@middleware/rbac.middleware';
 import { validate }        from '@middleware/validate.middleware';
 import * as StationController from './station.controller';
 import * as V from './station.validation';
+// Register discriminator models so they are available in the stations collection
+import './station.discriminators';
 
 const router = Router();
 

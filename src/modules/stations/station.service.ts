@@ -1,10 +1,13 @@
-import { Types, PipelineStage } from 'mongoose';
+import mongoose, { Types, PipelineStage } from 'mongoose';
 import { Station } from './station.model';
-import '@modules/users/user.model';
+import { User } from '@modules/users/user.model';
+import { AuditLog } from '@modules/permissions/audit_log.model';
 import type { IStation, ListStationsQuery, NearbyStationsQuery, CreateStationInput, UpdateStationInput } from '@/types';
 import { forwardGeocode, reverseGeocode } from '@utils/geocoder';
 import ApiError from '@utils/ApiError';
 import logger from '@utils/logger';
+import { config } from '@config/env';
+import { container } from '@/container';
 
 function buildSort(sortBy: string): Record<string, 1 | -1> {
   switch (sortBy) {
@@ -197,34 +200,113 @@ export async function updateStation(id: string, input: UpdateStationInput, reque
 export async function approveStation(id: string, moderatorId: string): Promise<IStation> {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Station not found');
 
-  const station = await Station.findOne({ _id: id, isActive: true });
-  if (!station) throw ApiError.notFound('Station not found');
-  if (station.status !== 'pending') throw ApiError.badRequest(`Cannot approve a station with status "${station.status}". Only pending stations can be approved.`);
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  station.status = 'active';
-  station.isVerified = true;
-  station.verifiedBy = new Types.ObjectId(moderatorId);
-  station.verifiedAt = new Date();
-  station.rejectionReason = null;
-  await station.save();
+  try {
+    const station = await Station.findOne({ _id: id, isActive: true }).session(session);
+    if (!station) throw ApiError.notFound('Station not found');
+    if (station.status !== 'pending') throw ApiError.badRequest(`Cannot approve a station with status "${station.status}". Only pending stations can be approved.`);
 
-  logger.info(`[stations] Approved: "${station.name}" (${station._id}) by ${moderatorId}`);
-  return station;
+    const before = { status: station.status, isVerified: station.isVerified };
+
+    station.status = 'active';
+    station.isVerified = true;
+    station.verifiedBy = new Types.ObjectId(moderatorId);
+    station.verifiedAt = new Date();
+    station.rejectionReason = null;
+    await station.save({ session });
+
+    await AuditLog.create(
+      [{
+        actor:      new Types.ObjectId(moderatorId),
+        action:     'station.approved',
+        resource:   'Station',
+        resourceId: station._id as Types.ObjectId,
+        before,
+        after: { status: station.status, isVerified: station.isVerified },
+      }],
+      { session },
+    );
+
+    await session.commitTransaction();
+    logger.info(`[stations] Approved: "${station.name}" (${station._id}) by ${moderatorId}`);
+
+    // Fire-and-forget email — must never block or crash the response
+    User.findById(station.submittedBy).select('_id email displayName').lean()
+      .then(submitter => {
+        if (submitter) {
+          const stationUrl = `${config.APP_URL}/stations/${station._id}`;
+          container.emailService.sendStationApproved(
+            { _id: submitter._id, email: submitter.email, displayName: submitter.displayName },
+            station.name,
+            stationUrl,
+          ).catch(err => logger.error('[stations] Approve email failed:', err));
+        }
+      })
+      .catch(err => logger.error('[stations] Failed to fetch submitter for approve email:', err));
+
+    return station;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    await session.endSession();
+  }
 }
 
 export async function rejectStation(id: string, rejectionReason: string, moderatorId: string): Promise<IStation> {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Station not found');
 
-  const station = await Station.findOne({ _id: id, isActive: true });
-  if (!station) throw ApiError.notFound('Station not found');
-  if (station.status !== 'pending') throw ApiError.badRequest(`Cannot reject a station with status "${station.status}". Only pending stations can be rejected.`);
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  station.status = 'rejected';
-  station.rejectionReason = rejectionReason;
-  await station.save();
+  try {
+    const station = await Station.findOne({ _id: id, isActive: true }).session(session);
+    if (!station) throw ApiError.notFound('Station not found');
+    if (station.status !== 'pending') throw ApiError.badRequest(`Cannot reject a station with status "${station.status}". Only pending stations can be rejected.`);
 
-  logger.info(`[stations] Rejected: "${station.name}" (${station._id}) by ${moderatorId}. Reason: ${rejectionReason}`);
-  return station;
+    const before = { status: station.status, rejectionReason: station.rejectionReason };
+
+    station.status = 'rejected';
+    station.rejectionReason = rejectionReason;
+    await station.save({ session });
+
+    await AuditLog.create(
+      [{
+        actor:      new Types.ObjectId(moderatorId),
+        action:     'station.rejected',
+        resource:   'Station',
+        resourceId: station._id as Types.ObjectId,
+        before,
+        after: { status: station.status, rejectionReason },
+      }],
+      { session },
+    );
+
+    await session.commitTransaction();
+    logger.info(`[stations] Rejected: "${station.name}" (${station._id}) by ${moderatorId}. Reason: ${rejectionReason}`);
+
+    // Fire-and-forget email
+    User.findById(station.submittedBy).select('_id email displayName').lean()
+      .then(submitter => {
+        if (submitter) {
+          container.emailService.sendStationRejected(
+            { _id: submitter._id, email: submitter.email, displayName: submitter.displayName },
+            station.name,
+            rejectionReason,
+          ).catch(err => logger.error('[stations] Reject email failed:', err));
+        }
+      })
+      .catch(err => logger.error('[stations] Failed to fetch submitter for reject email:', err));
+
+    return station;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    await session.endSession();
+  }
 }
 
 export async function deleteStation(id: string, deletedById: string): Promise<void> {
