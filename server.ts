@@ -26,6 +26,54 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+// ─── Security validation (fail-fast) ─────────────────────────────────────────
+function isLocalhostOrigin(origin: string): boolean {
+  return /^http:\/\/localhost:\d+$/.test(origin);
+}
+
+function isValidOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin);
+    // Must be an origin only (no path/query/fragment)
+    if (u.origin !== origin) return false;
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+const corsOrigins = config.CORS_ORIGINS;
+if (!Array.isArray(corsOrigins) || corsOrigins.length === 0) {
+  logger.error('CORS misconfiguration: CORS_ORIGINS is empty');
+  process.exit(1);
+}
+
+if (corsOrigins.some(o => o === '*' || o.includes('*'))) {
+  logger.error('CORS misconfiguration: wildcard origins are not allowed');
+  process.exit(1);
+}
+
+for (const origin of corsOrigins) {
+  if (!isValidOrigin(origin)) {
+    logger.error(`CORS misconfiguration: invalid origin "${origin}"`);
+    process.exit(1);
+  }
+
+  // Production must be HTTPS-only (localhost allowed only for non-production)
+  if (config.NODE_ENV === 'production') {
+    const u = new URL(origin);
+    if (u.protocol !== 'https:') {
+      logger.error(`CORS misconfiguration: non-HTTPS origin in production: "${origin}"`);
+      process.exit(1);
+    }
+  } else {
+    // Non-production: allow localhost http for dev
+    if (origin.startsWith('http://') && !isLocalhostOrigin(origin)) {
+      logger.warn(`CORS warning: non-HTTPS non-localhost origin allowed: "${origin}"`);
+    }
+  }
+}
+
 // ─── Import app AFTER env is validated ────────────────────────────────────────
 import app from './app';
 import http from 'http';

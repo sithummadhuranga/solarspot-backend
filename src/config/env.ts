@@ -50,4 +50,11 @@ export const config = {
 
   // ── CORS ──────────────────────────────────────────────────
   FRONTEND_URL: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  // Comma-separated list of allowed browser origins. If unset, defaults to FRONTEND_URL.
+  // Examples:
+  //   CORS_ORIGINS=https://solarspot.vercel.app,http://localhost:3000
+  CORS_ORIGINS: (process.env.CORS_ORIGINS ?? process.env.FRONTEND_URL ?? 'http://localhost:3000')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean),
 };
