@@ -46,11 +46,12 @@ beforeAll(async () => {
   adminToken  = adm.token;
   adminUserId = adm.userId;
 
-  // Promote admin to super_admin role
-  const superAdminRole = await Role.findOne({ name: 'super_admin' }).lean();
-  if (superAdminRole) {
-    await User.findByIdAndUpdate(adminUserId, { role: superAdminRole._id });
-    // Re-login to get a new token with updated role
+  // Promote admin to 'admin' role so the JWT carries roleLevel=4 and the
+  // permission engine's admin bypass fires on every protected endpoint.
+  const adminRole = await Role.findOne({ name: 'admin' }).lean();
+  if (adminRole) {
+    await User.findByIdAndUpdate(adminUserId, { role: adminRole._id });
+    // Re-login to embed the updated role ObjectId + roleLevel=4 into the token.
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: ADM_USER.email, password: ADM_USER.password });
@@ -130,8 +131,8 @@ describe('GET /api/users', () => {
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.data).toBeDefined();
-    expect(typeof res.body.data.total).toBe('number');
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(typeof res.body.pagination.total).toBe('number');
   });
 
   it('403 — regular user cannot list all users', async () => {
@@ -171,7 +172,7 @@ describe('PUT /api/users/:id (admin)', () => {
 describe('DELETE /api/users/me', () => {
   it('204 — soft-deletes own account', async () => {
     // Create a throwaway user
-    const throwaway = { displayName: 'Throwaway', email: `throw-${Date.now()}@test.example`, password: 'Delete1!' };
+    const throwaway = { displayName: 'Throwaway', email: `throw-${Date.now()}@example.com`, password: 'Delete1!' };
     const { token } = await registerAndLogin(throwaway);
 
     const res = await request(app)

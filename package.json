@@ -23,7 +23,7 @@
     "test:coverage": "jest --config jest.config.ts --coverage --runInBand --forceExit",
     "test:perf":     "npx artillery run src/tests/performance/artillery.yml --output report.json",
     "test:perf:report": "npx artillery report report.json",
-    "lint": "eslint src app.ts server.ts",
+    "lint": "eslint src app.ts server.ts --max-warnings=0",
     "format": "prettier --write \"src/**/*.ts\" app.ts server.ts"
   },
   "dependencies": {
