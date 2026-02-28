@@ -14,6 +14,12 @@ import logger from '@utils/logger';
 
 const app = express();
 
+// Running behind a reverse proxy (Render, Vercel rewrites, etc.)
+// Ensures `req.ip` and related security middleware behave correctly.
+if (config.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 app.use(
   helmet({
     contentSecurityPolicy: config.NODE_ENV === 'production' ? undefined : false,
@@ -24,10 +30,15 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
+      // In development, allow any localhost port (Vite, Swagger, etc.)
       if (config.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
         return callback(null, true);
       }
-      if (origin === config.FRONTEND_URL) return callback(null, true);
+
+      // In all envs, allow explicit allow-list origins
+      const allowed = new Set(config.CORS_ORIGINS);
+      if (allowed.has(origin)) return callback(null, true);
+
       return callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
