@@ -6,9 +6,11 @@
  */
 
 import { Types } from 'mongoose';
+import axios from 'axios';
 import * as reviewService from '@modules/reviews/review.service';
 import { Review } from '@modules/reviews/review.model';
 import { Station } from '@modules/stations/station.model';
+import { container } from '@/container';
 
 /* ── Mocks ──────────────────────────────────────────────────────────────────── */
 
@@ -54,8 +56,14 @@ jest.mock('@/container', () => ({
   },
 }));
 
-// Ensure axios is never called in unit tests (quota check returns false first)
-jest.mock('axios');
+// Axios is explicitly mocked so tests can assert call arguments when quota allows it
+jest.mock('axios', () => ({
+  __esModule: true,
+  default: {
+    post: jest.fn(),
+    get:  jest.fn(),
+  },
+}));
 
 jest.mock('@config/env', () => ({
   config: {
@@ -562,6 +570,34 @@ describe('listFlaggedReviews', () => {
   });
 });
 
+/* ── listReviews — sort option branch coverage ──────────────────────────────── */
+
+/**
+ * buildSort() has 5 cases; the 'newest' and default paths are already exercised
+ * by the main listReviews suite above. These parameterised cases ensure the
+ * remaining switch branches (oldest, highest, lowest, helpful) are covered.
+ */
+describe('listReviews — sort option branches', () => {
+  it.each([
+    ['oldest',  { createdAt: 1 }],
+    ['highest', { rating: -1, createdAt: -1 }],
+    ['lowest',  { rating: 1,  createdAt: -1 }],
+    ['helpful', { helpfulCount: -1, createdAt: -1 }],
+  ] as const)(  // `as const` preserves literal types for the jest type inference
+    'sort="%s" passes the correct sort document into Mongoose',
+    async (sort, expectedSort) => {
+      const chain = makeChain([]);
+      (Review.find as jest.Mock).mockReturnValue(chain);
+      (Review.countDocuments as jest.Mock).mockResolvedValue(0);
+
+      await reviewService.listReviews({ sort });
+
+      // The Mongoose query chain's .sort() must receive the expected sort document
+      expect(chain.sort).toHaveBeenCalledWith(expectedSort);
+    },
+  );
+});
+
 /* ── moderateReview ─────────────────────────────────────────────────────────── */
 
 describe('moderateReview', () => {
@@ -623,5 +659,144 @@ describe('moderateReview', () => {
     await expect(
       reviewService.moderateReview('bad-id', MOD_ID, { moderationStatus: 'approved' }),
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+/* ── createReview — Perspective API toxicity scoring branches ────────────────── */
+
+/**
+ * These tests unlock the checkToxicity() code path by overriding the quota mock
+ * to return `true` for one call, then providing controlled axios responses.
+ * This covers lines that are otherwise unreachable in unit tests (quota always
+ * returns false in the module-level mock).
+ *
+ * Mapping to coverage gaps:
+ *  - score >= 0.80  → moderationStatus 'rejected'  (auto-reject branch)
+ *  - score 0.60–0.79 → moderationStatus 'pending'   (human-review branch)
+ *  - score < 0.60   → moderationStatus 'approved'   (auto-approve branch)
+ *  - non-numeric    → toxicityScore omitted, approved by default
+ *  - axios throws   → catch branch, approved by default
+ */
+describe('createReview — Perspective API toxicity scoring', () => {
+  const toxicityInput = {
+    station: STATION_ID,
+    rating:  3,
+    title:   'Toxicity test review',
+    content: 'Really enjoyed charging here. Fast and reliable.',
+  };
+
+  /** Re-usable helper: sets up the station and duplicate-check mocks per test */
+  function setupCreateMocks(): void {
+    (Station.findOne as jest.Mock).mockResolvedValue(makeMockStation());
+    (Review.findOne  as jest.Mock).mockResolvedValue(null);
+  }
+
+  it('auto-rejects review with moderationStatus "rejected" when Perspective score >= 0.80', async () => {
+    // Allow quota for ONE call, then fall back to the module-level mock (false)
+    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
+    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
+    (axios.post as jest.Mock).mockResolvedValueOnce({
+      data: { attributeScores: { TOXICITY: { summaryScore: { value: 0.85 } } } },
+    });
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'rejected' }));
+
+    await reviewService.createReview(AUTHOR_ID, toxicityInput);
+
+    // Inspect what was actually passed to Review.create, not the resolved mock value
+    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+    expect(createArg.moderationStatus).toBe('rejected');
+    expect(createArg.toxicityScore).toBe(0.85);
+  });
+
+  it('holds review as "pending" when Perspective score is >= 0.60 and < 0.80', async () => {
+    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
+    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
+    (axios.post as jest.Mock).mockResolvedValueOnce({
+      data: { attributeScores: { TOXICITY: { summaryScore: { value: 0.70 } } } },
+    });
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'pending' }));
+
+    await reviewService.createReview(AUTHOR_ID, toxicityInput);
+
+    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+    expect(createArg.moderationStatus).toBe('pending');
+    expect(createArg.toxicityScore).toBe(0.70);
+  });
+
+  it('auto-approves review when Perspective score < 0.60', async () => {
+    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
+    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
+    (axios.post as jest.Mock).mockResolvedValueOnce({
+      data: { attributeScores: { TOXICITY: { summaryScore: { value: 0.25 } } } },
+    });
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    await reviewService.createReview(AUTHOR_ID, toxicityInput);
+
+    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+    expect(createArg.moderationStatus).toBe('approved');
+    expect(createArg.toxicityScore).toBe(0.25);
+  });
+
+  it('omits toxicityScore and defaults to "approved" when API response has non-numeric value', async () => {
+    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
+    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
+    // Perspective occasionally returns null or string when the model is unavailable
+    (axios.post as jest.Mock).mockResolvedValueOnce({
+      data: { attributeScores: { TOXICITY: { summaryScore: { value: null } } } },
+    });
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    await reviewService.createReview(AUTHOR_ID, toxicityInput);
+
+    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+    expect(createArg.moderationStatus).toBe('approved');
+    // checkToxicity() returns null → the spread omits toxicityScore
+    expect(createArg.toxicityScore).toBeUndefined();
+  });
+
+  it('degrades gracefully and defaults to "approved" when Perspective API HTTP call fails', async () => {
+    // Quota allows the call, but the network fails — checkToxicity enters the catch branch
+    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
+    (axios.post as jest.Mock).mockRejectedValueOnce(new Error('Simulated network timeout'));
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    // createReview must NOT throw — Perspective failure is a soft degradation
+    await expect(
+      reviewService.createReview(AUTHOR_ID, toxicityInput),
+    ).resolves.toBeDefined();
+
+    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+    // catch block returns null → no toxicityScore field included, moderationStatus defaults to approved
+    expect(createArg.moderationStatus).toBe('approved');
+    expect(createArg.toxicityScore).toBeUndefined();
+  });
+
+  it('skips toxicity check and approves by default when PERSPECTIVE_API_KEY is not configured', async () => {
+    // Temporarily remove the key to exercise the early-return branch in checkToxicity
+    const configMod = jest.requireMock('@config/env') as { config: { PERSPECTIVE_API_KEY: string; NODE_ENV: string } };
+    const savedKey = configMod.config.PERSPECTIVE_API_KEY;
+    configMod.config.PERSPECTIVE_API_KEY = '';
+
+    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    try {
+      await reviewService.createReview(AUTHOR_ID, toxicityInput);
+    } finally {
+      // Always restore key so this test does not bleed into subsequent tests
+      configMod.config.PERSPECTIVE_API_KEY = savedKey;
+    }
+
+    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+    expect(createArg.moderationStatus).toBe('approved');
+    // axios.post must never be called when the key is missing
+    expect(axios.post).not.toHaveBeenCalled();
   });
 });
