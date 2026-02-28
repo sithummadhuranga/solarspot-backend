@@ -37,6 +37,7 @@ import { seedRolePermissions } from './04_role_permissions';
 import { seedDemoUsers }       from './05_demo_users';
 import { seedDemoStations }    from './06_demo_stations';
 import { seedDemoReviews }     from './07_demo_reviews';
+import { seedProductionAdmin } from './prod_admin';
 
 type SeederEntry = { name: string; fn: (session: mongoose.ClientSession) => Promise<void> };
 
@@ -62,67 +63,7 @@ const PRODUCTION_SEEDERS: SeederEntry[] = [
   { name: 'prod_admin', fn: seedProductionAdmin },
 ];
 
-export type SeedMode = 'full' | 'core' | 'demo' | 'production' | 'verify';
-
-/**
- * Run seeders using an already-open Mongoose connection.
- * Used by server.ts when the RUN_SEED env var is set (Render free tier has no shell).
- */
-export async function runSeedersOnExistingConnection(mode: SeedMode): Promise<void> {
-  if (mode === 'verify') {
-    const meta = await SystemMeta.findOne().lean();
-    if (!meta) {
-      logger.error('seed:verify FAILED — system_meta document not found. Run seed:core first.');
-      throw new Error('seed:verify failed');
-    }
-    const expected = crypto
-      .createHash('sha256')
-      .update(JSON.stringify({ PERMISSIONS_SEED, POLICIES_SEED, ROLES_SEED }))
-      .digest('hex');
-    if (meta.seedManifestHash !== expected) {
-      logger.error(`seed:verify FAILED — manifest hash mismatch.\n  stored : ${meta.seedManifestHash}\n  current: ${expected}`);
-      throw new Error('seed:verify failed');
-    }
-    logger.info(`seed:verify PASSED — schema v${meta.schemaVersion}`);
-    return;
-  }
-
-  const seeders = mode === 'core'
-    ? CORE_SEEDERS
-    : mode === 'demo'
-    ? DEMO_SEEDERS
-    : mode === 'production'
-    ? PRODUCTION_SEEDERS
-    : [...CORE_SEEDERS, ...DEMO_SEEDERS];
-
-  const session = await mongoose.startSession();
-  let usedTransaction = false;
-  try {
-    await session.withTransaction(async () => {
-      for (const seeder of seeders) {
-        logger.info(`Running seeder: ${seeder.name}`);
-        await seeder.fn(session);
-        logger.info(`✓ ${seeder.name}`);
-      }
-    });
-    usedTransaction = true;
-  } catch (err: unknown) {
-    const msg = (err as { message?: string })?.message ?? '';
-    if (msg.includes('replica set') || msg.includes('Transaction numbers')) {
-      logger.warn('Transactions not supported — falling back to no-session mode');
-      for (const seeder of seeders) {
-        logger.info(`Running seeder: ${seeder.name}`);
-        await seeder.fn(undefined as unknown as mongoose.ClientSession);
-        logger.info(`✓ ${seeder.name}`);
-      }
-    } else {
-      throw err;
-    }
-  } finally {
-    session.endSession();
-  }
-  logger.info(`Seed complete [mode: ${mode}] — ${seeders.length} seeders ran${usedTransaction ? ' (with transaction)' : ' (no-session fallback)'}`);
-}
+type SeedMode = 'full' | 'core' | 'demo' | 'production' | 'verify';
 
 async function run(mode: SeedMode = 'full'): Promise<void> {
   await mongoose.connect(config.MONGODB_URI);
