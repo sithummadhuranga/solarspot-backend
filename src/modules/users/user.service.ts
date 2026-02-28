@@ -31,7 +31,7 @@ class UserService {
     const user = await User.findByIdAndUpdate(
       userId,
       { $set: input },
-      { new: true, runValidators: true },
+      { returnDocument: 'after', runValidators: true },
     ).populate('role');
 
     if (!user) throw ApiError.notFound('User not found');
@@ -137,9 +137,9 @@ class UserService {
           [{ actor: actorId, action: 'users.manage', resource: 'User', resourceId: targetId, before, after }],
           { session },
         );
-
-        updated = await User.findById(targetId).populate('role').lean() as IUser;
       });
+      // Read after commit so the updated fields are visible outside the transaction.
+      updated = await User.findById(targetId).populate('role').lean() as IUser;
     } finally {
       await session.endSession();
     }

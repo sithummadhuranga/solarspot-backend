@@ -44,11 +44,16 @@ export const protect = asyncHandler(
       throw ApiError.unauthorized('Invalid or expired access token');
     }
 
+    // Cast to a wider type so we can safely read the roleLevel field that
+    // auth.service.generateAccessToken bakes into every JWT payload.
+    const full = decoded as unknown as { _id: string; email: string; role: string; isEmailVerified: boolean; roleLevel?: number };
+
     req.user = {
-      _id:             decoded._id,
-      email:           decoded.email,
-      role:            decoded.role,
-      isEmailVerified: decoded.isEmailVerified ?? false,
+      _id:             full._id,
+      email:           full.email,
+      role:            full.role,
+      roleLevel:       full.roleLevel,
+      isEmailVerified: full.isEmailVerified ?? false,
     };
 
     next();
@@ -66,9 +71,9 @@ export const optionalAuth = asyncHandler(
       try {
         const secret = process.env.JWT_SECRET ?? '';
         const decoded = jwt.verify(authHeader.slice(7), secret) as {
-          _id: string; email: string; role: 'user' | 'moderator' | 'admin'; isEmailVerified: boolean;
+          _id: string; email: string; role: string; isEmailVerified: boolean; roleLevel?: number;
         };
-        req.user = { _id: decoded._id, email: decoded.email, role: decoded.role, isEmailVerified: decoded.isEmailVerified ?? false };
+        req.user = { _id: decoded._id, email: decoded.email, role: decoded.role, roleLevel: decoded.roleLevel, isEmailVerified: decoded.isEmailVerified ?? false };
       } catch { /* silently continue */ }
     }
     next();

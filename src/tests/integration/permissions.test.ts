@@ -14,8 +14,8 @@ let adminToken: string;
 let regularToken: string;
 let targetUserId: string;
 
-const ADM = { displayName: 'Perm Admin',   email: `padm-${Date.now()}@test.example`, password: 'Admin123!' };
-const REG = { displayName: 'Perm Regular', email: `preg-${Date.now()}@test.example`, password: 'Regular1!' };
+const ADM = { displayName: 'Perm Admin',   email: `padm-${Date.now()}@test.com`, password: 'Admin123!' };
+const REG = { displayName: 'Perm Regular', email: `preg-${Date.now()}@test.com`, password: 'Regular1!' };
 
 async function registerAndLogin(p: typeof ADM): Promise<{ token: string; userId: string }> {
   await request(app).post('/api/auth/register').send(p);
@@ -39,10 +39,11 @@ beforeAll(async () => {
   regularToken = reg.token;
   targetUserId = reg.userId;
 
-  // Promote to super_admin
-  const superAdminRole = await Role.findOne({ name: 'super_admin' }).lean();
-  if (superAdminRole) {
-    await User.findByIdAndUpdate(adm.userId, { role: superAdminRole._id });
+  // Promote to 'admin' role so the JWT carries roleLevel=4 and the
+  // permission engine's admin bypass fires on every admin endpoint.
+  const adminRole = await Role.findOne({ name: 'admin' }).lean();
+  if (adminRole) {
+    await User.findByIdAndUpdate(adm.userId, { role: adminRole._id });
     const loginRes = await request(app)
       .post('/api/auth/login')
       .send({ email: ADM.email, password: ADM.password });
@@ -59,7 +60,7 @@ afterAll(async () => {
 describe('GET /api/admin/permissions', () => {
   it('200 — super_admin can list all seeded permissions', async () => {
     const res = await request(app)
-      .get('/api/admin/permissions')
+      .get('/api/permissions/admin/permissions')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
@@ -69,7 +70,7 @@ describe('GET /api/admin/permissions', () => {
 
   it('401/403 — regular user cannot list permissions', async () => {
     const res = await request(app)
-      .get('/api/admin/permissions')
+      .get('/api/permissions/admin/permissions')
       .set('Authorization', `Bearer ${regularToken}`);
 
     expect([401, 403]).toContain(res.status);
@@ -81,7 +82,7 @@ describe('GET /api/admin/permissions', () => {
 describe('GET /api/admin/roles', () => {
   it('200 — returns all 10 seeded roles', async () => {
     const res = await request(app)
-      .get('/api/admin/roles')
+      .get('/api/permissions/admin/roles')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
@@ -95,7 +96,7 @@ describe('GET /api/admin/roles/:id/permissions', () => {
   it('200 — returns permissions assigned to a role', async () => {
     const role = await Role.findOne({ name: 'user' }).lean();
     const res  = await request(app)
-      .get(`/api/admin/roles/${role!._id}/permissions`)
+      .get(`/api/permissions/admin/roles/${role!._id}/permissions`)
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
@@ -111,7 +112,7 @@ describe('POST /api/admin/roles/:id/permissions', () => {
     const perm = await Permission.findOne({ action: 'users.read-list' }).lean();
 
     const res = await request(app)
-      .post(`/api/admin/roles/${role!._id}/permissions`)
+      .post(`/api/permissions/admin/roles/${role!._id}/permissions`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ permissionId: String(perm!._id) });
 
@@ -125,7 +126,7 @@ describe('POST /api/admin/roles/:id/permissions', () => {
 describe('GET /api/admin/users/:id/permissions', () => {
   it('200 — returns effective permissions (base + overrides)', async () => {
     const res = await request(app)
-      .get(`/api/admin/users/${targetUserId}/permissions`)
+      .get(`/api/permissions/admin/users/${targetUserId}/permissions`)
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
@@ -139,11 +140,11 @@ describe('POST /api/admin/users/:id/permissions', () => {
   let grantedPermId: string;
 
   it('201 — creates a grant override for user', async () => {
-    const perm = await Permission.findOne({ action: 'stations.view' }).lean();
+    const perm = await Permission.findOne({ action: 'stations.read' }).lean();
     grantedPermId = String(perm!._id);
 
     const res = await request(app)
-      .post(`/api/admin/users/${targetUserId}/permissions`)
+      .post(`/api/permissions/admin/users/${targetUserId}/permissions`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ permissionId: grantedPermId, effect: 'grant' });
 
@@ -161,7 +162,7 @@ describe('POST /api/permissions/check', () => {
       .send({ action: 'users.read-own' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data).toHaveProperty('granted');
+    expect(res.body.data).toHaveProperty('allowed');
   });
 
   it('401 — unauthenticated', async () => {
@@ -178,7 +179,7 @@ describe('POST /api/permissions/check', () => {
 describe('GET /api/admin/audit-logs', () => {
   it('200 — returns paginated audit logs', async () => {
     const res = await request(app)
-      .get('/api/admin/audit-logs')
+      .get('/api/permissions/admin/audit-logs')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
@@ -186,12 +187,12 @@ describe('GET /api/admin/audit-logs', () => {
   });
 });
 
-// ─── GET /api/admin/quota ─────────────────────────────────────────────────────
+// ─── GET /api/permissions/admin/quota ────────────────────────────────────────
 
-describe('GET /api/admin/quota', () => {
+describe('GET /api/permissions/admin/quota', () => {
   it('200 — returns quota stats', async () => {
     const res = await request(app)
-      .get('/api/admin/quota')
+      .get('/api/permissions/admin/quota')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);

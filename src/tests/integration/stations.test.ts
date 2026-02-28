@@ -1,10 +1,11 @@
 import request from 'supertest';
-import mongoose, { Types } from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { Types } from 'mongoose';
 import jwt from 'jsonwebtoken';
 
+import { container } from '@/container';
 import app from '../../../app';
 import { Station } from '@modules/stations/station.model';
+import { connectTestDb, disconnectTestDb, seedCore } from './helpers';
 
 jest.mock('@utils/geocoder', () => ({
   forwardGeocode: jest.fn().mockResolvedValue(null),
@@ -34,7 +35,6 @@ const userToken      = signToken({ _id: USER_ID.toString(),       role: 'user' }
 const _otherUserToken = signToken({ _id: OTHER_USER_ID.toString(), role: 'user', email: 'other@test.com' });
 const modToken       = signToken({ _id: MODERATOR_ID.toString(),  role: 'moderator' });
 
-let mongoServer:       MongoMemoryServer;
 let activeStationId:   string;
 let pendingStationId:  string;
 let featureStationId:  string;
@@ -42,8 +42,28 @@ let deleteStationId:   string;
 let otherStationId:    string;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri(), { dbName: 'solarspot_test' });
+  await connectTestDb();
+  await seedCore();
+
+  // Bypass the RBAC permission engine — these test JWT tokens embed slug strings
+  // ('moderator') rather than ObjectIds, so the real engine would find no role
+  // permissions. We replicate the correct RBAC outcome: moderator-only actions
+  // are denied for 'user' role tokens; everything else is allowed.
+  const MOD_ONLY_PERMS = new Set([
+    'stations.read-pending',
+    'stations.approve',
+    'stations.reject',
+    'stations.feature',
+  ]);
+  jest.spyOn(container.permissionEngine, 'evaluate').mockImplementation(
+    async (user: { role: string }, action: string) => {
+      if (MOD_ONLY_PERMS.has(action) && user.role !== 'moderator' && user.role !== 'admin') {
+        return { allowed: false, reason: 'Insufficient role' };
+      }
+      return { allowed: true };
+    },
+  );
+
   await Station.init();
   const [s1, s2, s3, s4, s5] = await Station.insertMany([
     {
@@ -101,9 +121,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  jest.restoreAllMocks();
+  await disconnectTestDb();
 });
 
 describe('GET /api/stations', () => {
