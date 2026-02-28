@@ -201,7 +201,7 @@ export class AuthService {
    * Verify old refresh token → rotate: invalidate old, issue new pair.
    * Uses findOneAndUpdate matching on OLD token — race-condition safe (Isolation rule).
    */
-  async refresh(oldRefreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async refresh(oldRefreshToken: string): Promise<{ accessToken: string; refreshToken: string; user: object }> {
     let decoded: { _id: string };
 
     try {
@@ -233,7 +233,9 @@ export class AuthService {
       isActive:        user.isActive,
       isBanned:        user.isBanned ?? false,
     });
-    return { accessToken, refreshToken: newRefreshToken };
+    // Return the user profile so the frontend can re-hydrate Redux without
+    // a separate /users/me round-trip after a page refresh.
+    return { accessToken, refreshToken: newRefreshToken, user: user.toJSON() };
   }
 
   /**

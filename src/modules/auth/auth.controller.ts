@@ -120,9 +120,11 @@ export const refresh = asyncHandler(async (req, res: Response) => {
   if (!oldRefreshToken) {
     return res.status(401).json(ApiResponse.error('UNAUTHORIZED', 'Refresh token missing'));
   }
-  const { accessToken, refreshToken } = await AuthService.refresh(oldRefreshToken);
+  const { accessToken, refreshToken, user } = await AuthService.refresh(oldRefreshToken);
   res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-  return ApiResponse.success(res, { accessToken }, 'Token refreshed');
+  // Include user so the frontend can restore the full Redux auth state in one
+  // round-trip — avoids a separate /users/me call after F5.
+  return ApiResponse.success(res, { accessToken, user }, 'Token refreshed');
 });
 
 /**
