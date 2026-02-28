@@ -77,6 +77,7 @@ for (const origin of corsOrigins) {
 // ─── Import app AFTER env is validated ────────────────────────────────────────
 import app from './app';
 import http from 'http';
+import { runSeedersOnExistingConnection, SeedMode } from './src/seed/runner';
 
 const PORT = parseInt(config.PORT, 10);
 const server = http.createServer(app);
@@ -122,6 +123,21 @@ process.on('SIGINT',  () => gracefulShutdown('SIGINT'));  // Ctrl-C
 (async () => {
   try {
     await connectDB();
+
+    // ─── On-startup seed (for Render free tier — no shell access) ────────────
+    // Set RUN_SEED=production (or core/full/demo) in Render env vars to trigger.
+    // Remove the env var after the first successful deploy to avoid re-seeding.
+    const runSeedMode = process.env.RUN_SEED as SeedMode | undefined;
+    if (runSeedMode) {
+      const validModes: SeedMode[] = ['full', 'core', 'demo', 'production', 'verify'];
+      if (!validModes.includes(runSeedMode)) {
+        logger.error(`RUN_SEED has invalid value "${runSeedMode}". Valid: ${validModes.join(', ')}`);
+        process.exit(1);
+      }
+      logger.info(`RUN_SEED=${runSeedMode} detected — running seed before server start`);
+      await runSeedersOnExistingConnection(runSeedMode);
+      logger.info('Seed completed — server will now start. Remove RUN_SEED env var to skip on next deploy.');
+    }
 
     server.listen(PORT, () => {
       logger.info('─────────────────────────────────────────────');
