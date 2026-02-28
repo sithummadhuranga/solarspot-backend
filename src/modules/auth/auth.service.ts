@@ -259,11 +259,7 @@ export class AuthService {
     });
     // Return the user profile so the frontend can re-hydrate Redux without
     // a separate /users/me round-trip after a page refresh.
-    return {
-      accessToken,
-      refreshToken: newRefreshToken,
-      user: this.serializeUserForClient(user),
-    };
+    return { accessToken, refreshToken: newRefreshToken, user: user.toJSON() };
   }
 
   /**
