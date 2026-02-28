@@ -37,6 +37,7 @@ import { seedRolePermissions } from './04_role_permissions';
 import { seedDemoUsers }       from './05_demo_users';
 import { seedDemoStations }    from './06_demo_stations';
 import { seedDemoReviews }     from './07_demo_reviews';
+import { seedProductionAdmin } from './prod_admin';
 
 type SeederEntry = { name: string; fn: (session: mongoose.ClientSession) => Promise<void> };
 
@@ -54,7 +55,15 @@ const DEMO_SEEDERS: SeederEntry[] = [
   { name: '07_demo_reviews',   fn: seedDemoReviews },
 ];
 
-type SeedMode = 'full' | 'core' | 'demo' | 'verify';
+// ⚠️  PRODUCTION ONLY — seeds core data + a single admin account from env vars.
+// Credentials are read from ADMIN_EMAIL and ADMIN_PASSWORD — never hardcoded.
+// Never includes demo users, stations, or reviews.
+const PRODUCTION_SEEDERS: SeederEntry[] = [
+  ...CORE_SEEDERS,
+  { name: 'prod_admin', fn: seedProductionAdmin },
+];
+
+type SeedMode = 'full' | 'core' | 'demo' | 'production' | 'verify';
 
 async function run(mode: SeedMode = 'full'): Promise<void> {
   await mongoose.connect(config.MONGODB_URI);
@@ -85,6 +94,8 @@ async function run(mode: SeedMode = 'full'): Promise<void> {
     ? CORE_SEEDERS
     : mode === 'demo'
     ? DEMO_SEEDERS
+    : mode === 'production'
+    ? PRODUCTION_SEEDERS
     : [...CORE_SEEDERS, ...DEMO_SEEDERS];
 
   if (seeders.length === 0) {
