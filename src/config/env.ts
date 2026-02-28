@@ -53,8 +53,10 @@ export const config = {
   // Comma-separated list of allowed browser origins. If unset, defaults to FRONTEND_URL.
   // Examples:
   //   CORS_ORIGINS=https://solarspot.vercel.app,http://localhost:3000
+  // Trailing slashes are stripped so operator typos (e.g. "https://foo.com/") don't
+  // crash the server — a URL origin never carries a trailing slash.
   CORS_ORIGINS: (process.env.CORS_ORIGINS ?? process.env.FRONTEND_URL ?? 'http://localhost:3000')
     .split(',')
-    .map(s => s.trim())
+    .map(s => s.trim().replace(/\/+$/, ''))
     .filter(Boolean),
 };
