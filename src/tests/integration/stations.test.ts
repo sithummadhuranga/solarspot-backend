@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Types } from 'mongoose';
 import jwt from 'jsonwebtoken';
 
+import { container } from '@/container';
 import app from '../../../app';
 import { Station } from '@modules/stations/station.model';
 import { connectTestDb, disconnectTestDb, seedCore } from './helpers';
@@ -43,6 +44,26 @@ let otherStationId:    string;
 beforeAll(async () => {
   await connectTestDb();
   await seedCore();
+
+  // Bypass the RBAC permission engine — these test JWT tokens embed slug strings
+  // ('moderator') rather than ObjectIds, so the real engine would find no role
+  // permissions. We replicate the correct RBAC outcome: moderator-only actions
+  // are denied for 'user' role tokens; everything else is allowed.
+  const MOD_ONLY_PERMS = new Set([
+    'stations.read-pending',
+    'stations.approve',
+    'stations.reject',
+    'stations.feature',
+  ]);
+  jest.spyOn(container.permissionEngine, 'evaluate').mockImplementation(
+    async (user: { role: string }, action: string) => {
+      if (MOD_ONLY_PERMS.has(action) && user.role !== 'moderator' && user.role !== 'admin') {
+        return { allowed: false, reason: 'Insufficient role' };
+      }
+      return { allowed: true };
+    },
+  );
+
   await Station.init();
   const [s1, s2, s3, s4, s5] = await Station.insertMany([
     {
@@ -100,6 +121,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  jest.restoreAllMocks();
   await disconnectTestDb();
 });
 
