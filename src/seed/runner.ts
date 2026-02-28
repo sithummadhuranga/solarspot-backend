@@ -196,9 +196,11 @@ async function run(mode: SeedMode = 'full'): Promise<void> {
   logger.info(`Seed complete [mode: ${mode}] — ${seeders.length} seeders ran${usedTransaction ? ' (with transaction)' : ' (no-session fallback)'}`);
 }
 
-// CLI entry point
-const mode = (process.argv[2] as SeedMode) ?? 'full';
-run(mode).catch((err) => {
-  logger.error('Seed runner failed:', err);
-  process.exit(1);
-});
+// CLI entry point — only runs when this file is executed directly (not when imported)
+if (require.main === module) {
+  const mode = (process.argv[2] as SeedMode) ?? 'full';
+  run(mode).catch((err) => {
+    logger.error('Seed runner failed:', err);
+    process.exit(1);
+  });
+}
