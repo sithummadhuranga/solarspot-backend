@@ -24,6 +24,7 @@
     "test:integration": "jest --config jest.integration.config.ts --runInBand --forceExit",
     "test:coverage": "jest --config jest.config.ts --coverage --runInBand --forceExit",
     "test:perf": "npx artillery run src/tests/performance/artillery.yml --output report.json",
+    "test:bdd": "TS_NODE_PROJECT=tsconfig.cucumber.json TS_NODE_TRANSPILE_ONLY=true cucumber-js",
     "test:perf:report": "npx artillery report report.json",
     "lint": "eslint src app.ts server.ts --max-warnings=0",
     "format": "prettier --write \"src/**/*.ts\" app.ts server.ts"
@@ -78,6 +79,7 @@
     "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.2",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "^8.0.0",
+    "@cucumber/cucumber": "^12.7.0"
   }
 }

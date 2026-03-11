@@ -1,0 +1,12 @@
+process.env.NODE_ENV           = 'test';
+process.env.JWT_SECRET         = 'test-jwt-secret-for-cucumber-tests-minimum-64-chars-padding!!';
+process.env.COOKIE_SECRET      = 'test-cookie-secret-32chars-pad!!';
+process.env.MONGODB_URI        = 'mongodb://localhost:27017/solarspot_cucumber';
+process.env.EMAIL_PREVIEW      = 'true';
+process.env.EMAIL_USER         = 'test@solarspot.dev';
+process.env.EMAIL_PASS         = 'test-password';
+process.env.OPENWEATHER_API_KEY    = 'test-openweather-key';
+process.env.PERSPECTIVE_API_KEY    = 'test-perspective-key';
+process.env.CLOUDINARY_CLOUD_NAME  = 'test-cloud';
+process.env.CLOUDINARY_API_KEY     = 'test-key';
+process.env.CLOUDINARY_API_SECRET  = 'test-secret';
