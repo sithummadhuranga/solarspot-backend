@@ -24,7 +24,7 @@
     "test:integration": "jest --config jest.integration.config.ts --runInBand --forceExit",
     "test:coverage": "jest --config jest.config.ts --coverage --runInBand --forceExit",
     "test:perf": "npx artillery run src/tests/performance/artillery.yml --output report.json",
-    "test:bdd": "TS_NODE_PROJECT=tsconfig.cucumber.json TS_NODE_TRANSPILE_ONLY=true cucumber-js",
+    "test:bdd": "cross-env TS_NODE_PROJECT=tsconfig.cucumber.json TS_NODE_TRANSPILE_ONLY=true cucumber-js",
     "test:perf:report": "npx artillery report report.json",
     "lint": "eslint src app.ts server.ts --max-warnings=0",
     "format": "prettier --write \"src/**/*.ts\" app.ts server.ts"
@@ -53,6 +53,7 @@
     "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@cucumber/cucumber": "^12.7.0",
     "@eslint/js": "^9.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.7.5",
@@ -68,6 +69,7 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",
     "copyfiles": "^2.4.1",
+    "cross-env": "^10.1.0",
     "eslint": "^9.0.0",
     "jest": "^29.7.0",
     "mongodb-memory-server": "^10.0.0",
@@ -79,7 +81,6 @@
     "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.2",
-    "typescript-eslint": "^8.0.0",
-    "@cucumber/cucumber": "^12.7.0"
+    "typescript-eslint": "^8.0.0"
   }
 }
