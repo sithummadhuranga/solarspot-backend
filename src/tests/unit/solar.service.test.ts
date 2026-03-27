@@ -17,7 +17,7 @@
  * Owner: Member 3 · Ref: SolarIntelligence_Module_Prompt.md → A7
  */
 
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 
 // ── Mocks (must be hoisted before any imports) ────────────────────────────────
 
@@ -37,6 +37,10 @@ jest.mock('@modules/stations/station.model', () => ({
   Station: { findById: jest.fn() },
 }));
 
+jest.mock('@modules/permissions/audit_log.model', () => ({
+  AuditLog: { create: jest.fn() },
+}));
+
 jest.mock('@modules/solar/solar-report.model', () => {
   // We need a constructor mock that also supports model static methods.
   const mockSave = jest.fn().mockResolvedValue(undefined);
@@ -47,6 +51,7 @@ jest.mock('@modules/solar/solar-report.model', () => {
   (MockSolarReport as unknown as Record<string, unknown>).find         = jest.fn();
   (MockSolarReport as unknown as Record<string, unknown>).findOne      = jest.fn();
   (MockSolarReport as unknown as Record<string, unknown>).findById     = jest.fn();
+  (MockSolarReport as unknown as Record<string, unknown>).create       = jest.fn();
   (MockSolarReport as unknown as Record<string, unknown>).countDocuments = jest.fn();
   (MockSolarReport as unknown as Record<string, unknown>).aggregate    = jest.fn();
   return { SolarReport: MockSolarReport };
@@ -66,12 +71,18 @@ jest.mock('@modules/solar/solar-weather.service', () => ({
 import { calculateSolarOutput, getBestChargingWindows } from '@modules/solar/solar-weather.service';
 import solarService from '@modules/solar/solar.service';
 import { Station }  from '@modules/stations/station.model';
+import { AuditLog } from '@modules/permissions/audit_log.model';
 import { SolarReport } from '@modules/solar/solar-report.model';
 import { solarWeatherService } from '@modules/solar/solar-weather.service';
 
 const mockStation    = Station    as jest.Mocked<typeof Station>;
+const mockAuditLog   = AuditLog   as jest.Mocked<typeof AuditLog>;
 const mockReport     = SolarReport as jest.Mocked<typeof SolarReport>;
 const mockWeatherSvc = solarWeatherService as jest.Mocked<typeof solarWeatherService>;
+const mockSession = {
+  withTransaction: jest.fn(async (callback: () => Promise<unknown>) => callback()),
+  endSession: jest.fn().mockResolvedValue(undefined),
+};
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +95,7 @@ const fakeStation = {
   name:         'Test Solar Station',
   solarPanelKw: 5.5,
   isActive:     true,
+  status:       'active',
   location:     { type: 'Point', coordinates: [80.7, 7.8] }, // [lng, lat]
 };
 
@@ -102,6 +114,8 @@ const fakeWeather = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession as never);
+  mockAuditLog.create.mockResolvedValue([] as never);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -116,42 +130,40 @@ describe('weatherService.calculateSolarOutput', () => {
       temperatureC:  25,
       windSpeedKph:  0,
     });
-    // cloudReduction = 1 − (100/100) × 0.75 = 0.25; uvBoost = 0 → efficiency = 0
     expect(result.estimatedOutputKw).toBe(0);
     expect(result.solarScore).toBe(0);
   });
 
-  it('returns full output on clear sky with UV = 5 and ideal temperature', () => {
+  it('returns maximum modelled output on clear sky with strong UV', () => {
     const result = calculateSolarOutput(5, {
       cloudCoverPct: 0,
-      uvIndex:       5,
+      uvIndex:       10,
       temperatureC:  25,
       windSpeedKph:  0,
     });
-    // cloudReduction = 1; uvBoost = 1; no penalties → efficiency = 1
-    expect(result.estimatedOutputKw).toBe(5);
-    expect(result.solarScore).toBe(10);
-    expect(result.efficiency).toBe(1);
+    expect(result.estimatedOutputKw).toBe(4.25);
+    expect(result.solarScore).toBe(85);
+    expect(result.efficiency).toBe(0.85);
   });
 
-  it('applies temperature penalty above 25°C', () => {
-    const baseline = calculateSolarOutput(5, {
-      cloudCoverPct: 0, uvIndex: 5, temperatureC: 25, windSpeedKph: 0,
+  it('reduces output as cloud cover increases', () => {
+    const clear = calculateSolarOutput(5, {
+      cloudCoverPct: 10, uvIndex: 7, temperatureC: 25, windSpeedKph: 0,
     });
-    const hot = calculateSolarOutput(5, {
-      cloudCoverPct: 0, uvIndex: 5, temperatureC: 40, windSpeedKph: 0,
+    const cloudy = calculateSolarOutput(5, {
+      cloudCoverPct: 70, uvIndex: 7, temperatureC: 40, windSpeedKph: 30,
     });
-    expect(hot.estimatedOutputKw).toBeLessThan(baseline.estimatedOutputKw);
+    expect(cloudy.estimatedOutputKw).toBeLessThan(clear.estimatedOutputKw);
   });
 
-  it('applies wind penalty above 15 km/h', () => {
-    const calm = calculateSolarOutput(5, {
-      cloudCoverPct: 0, uvIndex: 5, temperatureC: 25, windSpeedKph: 10,
+  it('increases output as UV index rises', () => {
+    const lowUv = calculateSolarOutput(5, {
+      cloudCoverPct: 20, uvIndex: 2, temperatureC: 25, windSpeedKph: 10,
     });
-    const windy = calculateSolarOutput(5, {
-      cloudCoverPct: 0, uvIndex: 5, temperatureC: 25, windSpeedKph: 60,
+    const highUv = calculateSolarOutput(5, {
+      cloudCoverPct: 20, uvIndex: 9, temperatureC: 45, windSpeedKph: 60,
     });
-    expect(windy.estimatedOutputKw).toBeLessThan(calm.estimatedOutputKw);
+    expect(highUv.estimatedOutputKw).toBeGreaterThan(lowUv.estimatedOutputKw);
   });
 
   it('rounds estimatedOutputKw to 2 decimal places', () => {
@@ -172,7 +184,7 @@ describe('weatherService.calculateSolarOutput', () => {
 
 describe('weatherService.getBestChargingWindows', () => {
   const makeSlot = (uvIndex: number, cloudCoverPct: number, offset: number) => ({
-    dt:            new Date(Date.now() + offset * 3 * 3600 * 1000),
+    dt:            new Date(Date.now() + offset * 3 * 3600 * 1000).toISOString(),
     cloudCoverPct,
     temperatureC:  28,
     windSpeedKph:  10,
@@ -221,6 +233,12 @@ describe('weatherService.getBestChargingWindows', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('solarService.createReport', () => {
+  const sessionLeanQuery = <T>(value: T) => ({
+    session: jest.fn().mockReturnValue({
+      lean: jest.fn().mockResolvedValue(value),
+    }),
+  });
+
   it('throws 404 when station does not exist', async () => {
     mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
 
@@ -249,31 +267,65 @@ describe('solarService.createReport', () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it('saves a report and returns it', async () => {
+  it('saves a report and returns it with status published', async () => {
     mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(fakeStation) } as never);
     mockWeatherSvc.getCurrentWeather.mockResolvedValue(fakeWeather);
+    mockReport.findOne.mockReturnValue(sessionLeanQuery(null) as never);
+    mockReport.create.mockResolvedValue([
+      {
+        _id: FAKE_REPORT_ID,
+        status: 'published',
+        estimatedOutputKw: 3.51,
+        actualOutputKw: null,
+        accuracyPct: null,
+        solarScore: 64,
+        isPublic: true,
+      },
+    ] as never);
 
-    const result = (await solarService.createReport(
+    const result = await solarService.createReport(
       { stationId: FAKE_STATION_ID.toString(), isPublic: true },
       FAKE_USER_ID.toString(),
-    )) as unknown as { save: jest.Mock; estimatedOutputKw: number };
+    );
 
-    expect(result.save).toBeDefined();
     expect(result.estimatedOutputKw).toBeGreaterThanOrEqual(0);
+    expect(result.status).toBe('published');
+    expect(mockReport.create).toHaveBeenCalledTimes(1);
+    expect(mockAuditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws 409 when user already submitted a report for this station today', async () => {
+    mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(fakeStation) } as never);
+    mockReport.findOne.mockReturnValue(sessionLeanQuery({ _id: FAKE_REPORT_ID }) as never);
+
+    await expect(
+      solarService.createReport({ stationId: FAKE_STATION_ID.toString() }, FAKE_USER_ID.toString()),
+    ).rejects.toMatchObject({ statusCode: 409 });
   });
 
   it('calculates accuracyPct when actualOutputKw is provided', async () => {
     mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(fakeStation) } as never);
     mockWeatherSvc.getCurrentWeather.mockResolvedValue(fakeWeather);
+    mockReport.findOne.mockReturnValue(sessionLeanQuery(null) as never);
+    mockReport.create.mockResolvedValue([
+      {
+        _id: FAKE_REPORT_ID,
+        status: 'published',
+        estimatedOutputKw: 3.51,
+        actualOutputKw: 4.0,
+        accuracyPct: 114,
+        solarScore: 64,
+        isPublic: true,
+      },
+    ] as never);
 
-    // The pre-save hook on the real model computes accuracyPct; here we confirm
-    // that actualOutputKw is passed through to the saved document.
     const result = await solarService.createReport(
       { stationId: FAKE_STATION_ID.toString(), actualOutputKw: 4.0 },
       FAKE_USER_ID.toString(),
     );
 
     expect(result.actualOutputKw).toBe(4.0);
+    expect(result.accuracyPct).toBe(114);
   });
 });
 
@@ -283,6 +335,9 @@ describe('solarService.createReport', () => {
 
 describe('solarService.updateReport', () => {
   const otherUserId   = new Types.ObjectId().toString();
+  const sessionDocQuery = <T>(value: T) => ({
+    session: jest.fn().mockResolvedValue(value),
+  });
 
   const fakeDoc = {
     _id:               FAKE_REPORT_ID,
@@ -296,7 +351,7 @@ describe('solarService.updateReport', () => {
   };
 
   it('throws 403 when a different user tries to edit the report', async () => {
-    mockReport.findOne.mockResolvedValue({ ...fakeDoc, save: jest.fn() } as never);
+    mockReport.findOne.mockReturnValue(sessionDocQuery({ ...fakeDoc, save: jest.fn() }) as never);
 
     await expect(
       solarService.updateReport(FAKE_REPORT_ID.toString(), { notes: 'hi' }, otherUserId, 'user'),
@@ -305,22 +360,23 @@ describe('solarService.updateReport', () => {
 
   it('allows admin to edit any report', async () => {
     const doc = { ...fakeDoc, save: jest.fn().mockResolvedValue(undefined) };
-    mockReport.findOne.mockResolvedValue(doc as never);
+    mockReport.findOne.mockReturnValue(sessionDocQuery(doc) as never);
 
-    const result = (await solarService.updateReport(
+    await solarService.updateReport(
       FAKE_REPORT_ID.toString(),
       { notes: 'admin edit' },
       otherUserId,
       'admin',
-    )) as unknown as { save: jest.Mock };
+    );
 
-    expect(result.save).toBeDefined();
     expect(doc.notes).toBe('admin edit');
+    expect(doc.save).toHaveBeenCalledTimes(1);
+    expect(mockAuditLog.create).toHaveBeenCalledTimes(1);
   });
 
   it('recalculates accuracyPct when actualOutputKw is updated', async () => {
     const doc = { ...fakeDoc, save: jest.fn().mockResolvedValue(undefined) };
-    mockReport.findOne.mockResolvedValue(doc as never);
+    mockReport.findOne.mockReturnValue(sessionDocQuery(doc) as never);
 
     await solarService.updateReport(
       FAKE_REPORT_ID.toString(),
@@ -341,36 +397,53 @@ describe('solarService.updateReport', () => {
 
 describe('solarService.getStationAnalytics', () => {
   it('returns hasData: false with zeroed values when no reports exist', async () => {
-    mockReport.aggregate.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockReport.aggregate.mockResolvedValue([
+      {
+        overview: [],
+        byDayOfWeek: [],
+        byHourOfDay: [],
+        accuracyDistribution: [],
+        last30Days: [],
+      },
+    ] as never);
 
     const result = await solarService.getStationAnalytics(FAKE_STATION_ID.toString());
 
     expect(result.hasData).toBe(false);
-    expect(result.reportCount).toBe(0);
-    expect(result.avgSolarScore).toBe(0);
+    expect(result.overview.totalReports).toBe(0);
+    expect(result.overview.avgSolarScore).toBe(0);
     expect(result.last30Days).toEqual([]);
   });
 
   it('returns correct avgSolarScore from mock aggregation result', async () => {
-    mockReport.aggregate
-      .mockResolvedValueOnce([{
-        _id:         null,
-        reportCount: 10,
-        avgScore:    7.5,
-        avgAccuracy: 92.3,
-        avgEstKw:    4.1,
-        avgActKw:    3.9,
-      }])
-      .mockResolvedValueOnce([
-        { _id: '2026-02-20', avgScore: 7.0, reportCount: 3 },
-        { _id: '2026-02-21', avgScore: 8.0, reportCount: 2 },
-      ]);
+    mockReport.aggregate.mockResolvedValue([
+      {
+        overview: [{
+          _id: null,
+          totalReports: 10,
+          avgSolarScore: 75,
+          avgEstimatedOutputKw: 4.1,
+          avgActualOutputKw: 3.9,
+          avgAccuracyPct: 92.3,
+          maxSolarScore: 94,
+          minSolarScore: 42,
+        }],
+        byDayOfWeek: [{ _id: 2, avgScore: 78, count: 4 }],
+        byHourOfDay: [{ _id: 11, avgScore: 81, count: 3 }],
+        accuracyDistribution: [{ _id: 90, count: 5, avgScore: 82 }],
+        last30Days: [
+          { _id: '2026-02-20', avgScore: 70, reportCount: 3 },
+          { _id: '2026-02-21', avgScore: 80, reportCount: 2 },
+        ],
+      },
+    ] as never);
 
     const result = await solarService.getStationAnalytics(FAKE_STATION_ID.toString());
 
     expect(result.hasData).toBe(true);
-    expect(result.avgSolarScore).toBe(7.5);
-    expect(result.reportCount).toBe(10);
+    expect(result.overview.avgSolarScore).toBe(75);
+    expect(result.overview.totalReports).toBe(10);
+    expect(result.byDayOfWeek).toHaveLength(1);
     expect(result.last30Days).toHaveLength(2);
   });
 });

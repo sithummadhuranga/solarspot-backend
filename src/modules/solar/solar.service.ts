@@ -1,23 +1,14 @@
 /**
- * SolarService — business logic for Solar Intelligence & Charging Analytics.
+ * Solar service — business logic for the Solar Intelligence module.
  *
- * This service is the only layer that:
- *   - reads / writes SolarReport documents
- *   - calls solarWeatherService for live weather or forecast
- *   - runs the MongoDB analytics aggregation pipeline
- *
- * Controllers are thin; all domain decisions live here.
- *
- * ACID compliance:
- *   - createReport: single document write — no transaction necessary.
- *   - deleteReport:  single document update (soft-delete) — atomic via Mongoose save.
- *   - publishReport: single document update — atomic.
- *
- * Owner: Member 3 · Ref: SolarIntelligence_Module_Prompt.md → A3
+ * Ref: SolarIntelligence_Module_Prompt.md → A3
  */
 
-import { Types }   from 'mongoose';
+import mongoose, { Types } from 'mongoose';
+import { AuditLog } from '@modules/permissions/audit_log.model';
 import { Station } from '@modules/stations/station.model';
+import ApiError from '@utils/ApiError';
+import logger from '@utils/logger';
 import { SolarReport, ISolarReport } from './solar-report.model';
 import {
   solarWeatherService,
@@ -27,180 +18,368 @@ import {
   type ForecastSlot,
   type BestWindow,
 } from './solar-weather.service';
-import ApiError  from '@utils/ApiError';
-import logger    from '@utils/logger';
-
-// ── DTOs ──────────────────────────────────────────────────────────────────────
 
 export interface CreateReportDto {
-  stationId:       string;
-  visitedAt?:      string;           // ISO string; defaults to now
+  stationId: string;
+  visitedAt?: string | Date;
   actualOutputKw?: number | null;
-  notes?:          string | null;
-  isPublic?:       boolean;
+  notes?: string | null;
+  isPublic?: boolean;
 }
 
 export interface UpdateReportDto {
   actualOutputKw?: number | null;
-  notes?:          string | null;
-  isPublic?:       boolean;
+  notes?: string | null;
+  isPublic?: boolean;
 }
 
 export interface ReportQuery {
-  stationId?:   string;
+  stationId?: string;
+  userId?: string;
   submittedBy?: string;
-  status?:      'draft' | 'published';
-  isPublic?:    boolean;
-  from?:        string;
-  to?:          string;
-  page?:        number;
-  limit?:       number;
-  sort?:        'newest' | 'oldest' | 'score';
+  status?: 'draft' | 'published' | 'archived';
+  isPublic?: boolean;
+  dateFrom?: string | Date;
+  dateTo?: string | Date;
+  from?: string | Date;
+  to?: string | Date;
+  minScore?: number;
+  page?: number;
+  limit?: number;
+  sort?: 'newest' | 'oldest' | 'highest-score' | 'most-accurate' | 'score';
 }
 
-// ── Response shapes ───────────────────────────────────────────────────────────
+export interface ViewerContext {
+  _id: string;
+  role: string;
+}
 
 export interface PaginatedResult<T> {
-  data:       T[];
+  data: T[];
   pagination: {
-    page:       number;
-    limit:      number;
-    total:      number;
+    page: number;
+    limit: number;
+    total: number;
     totalPages: number;
-    hasNext:    boolean;
-    hasPrev:    boolean;
+    hasNext: boolean;
+    hasPrev: boolean;
   };
 }
 
 export interface LiveWeatherResponse {
-  stationId:         string;
-  stationName:       string;
-  solarPanelKw:      number;
-  weather:           WeatherSnapshot;
-  estimatedOutputKw: number;
-  solarScore:        number;
+  station: {
+    _id: string;
+    name: string;
+    solarPanelKw: number;
+    address: { city: string | null };
+  };
+  weather: WeatherSnapshot;
+  solar: {
+    estimatedOutputKw: number;
+    solarScore: number;
+    cloudFactor: number;
+    uvFactor: number;
+  };
+  generatedAt: Date;
 }
 
 export interface ForecastWithSolarResponse {
-  stationId:    string;
-  stationName:  string;
-  solarPanelKw: number;
-  forecast:     ForecastSlot[];
-  bestWindows:  BestWindow[];
-}
-
-export interface DayAggregate {
-  _id:         string;   // YYYY-MM-DD
-  avgScore:    number;
-  reportCount: number;
+  station: {
+    _id: string;
+    name: string;
+    solarPanelKw: number;
+  };
+  forecast: ForecastSlot[];
+  bestWindows: BestWindow[];
+  generatedAt: Date;
 }
 
 export interface StationAnalytics {
-  hasData:              boolean;
-  reportCount:          number;
-  avgSolarScore:        number;
-  avgAccuracyPct:       number | null;
-  avgEstimatedOutputKw: number;
-  avgActualOutputKw:    number | null;
-  last30Days:           DayAggregate[];
+  hasData: boolean;
+  overview: {
+    totalReports: number;
+    avgSolarScore: number;
+    avgEstimatedOutputKw: number;
+    avgActualOutputKw: number;
+    avgAccuracyPct: number;
+    maxSolarScore: number;
+    minSolarScore: number;
+  };
+  byDayOfWeek: Array<{ _id: number; avgScore: number; count: number }>;
+  byHourOfDay: Array<{ _id: number; avgScore: number; count: number }>;
+  accuracyDistribution: Array<{ _id: number | string; count: number; avgScore: number }>;
+  last30Days: Array<{ _id: string; avgScore: number; reportCount: number }>;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Extracts [lng, lat] from a station document. Throws 400 if missing. */
 function extractCoords(station: { location?: { coordinates?: number[] } | null }): [number, number] {
   const coords = station.location?.coordinates;
   if (!coords || coords.length < 2) {
     throw ApiError.badRequest('Station does not have coordinates — weather data unavailable');
   }
-  return [coords[0], coords[1]]; // [lng, lat] → we need lat, lng
+
+  return [coords[0], coords[1]];
 }
 
-// ── Service ───────────────────────────────────────────────────────────────────
+function getAccuracyLabel(accuracyPct: number | null | undefined): string {
+  if (accuracyPct === null || accuracyPct === undefined) return 'No Data';
+  if (accuracyPct >= 110) return 'Overperforming';
+  if (accuracyPct >= 90) return 'Accurate';
+  if (accuracyPct >= 70) return 'Slightly Under';
+  return 'Underperforming';
+}
 
-/**
- * POST /api/solar/reports
- *
- * 1. Validates station exists and is active.
- * 2. Fetches live weather for the station's coordinate.
- * 3. Calculates estimated solar output.
- * 4. Saves the report (pre-save hook computes accuracyPct if actualOutputKw given).
- */
-export async function createReport(dto: CreateReportDto, userId: string): Promise<ISolarReport> {
-  const station = await Station.findById(dto.stationId).lean();
-  if (!station || !station.isActive) {
-    throw ApiError.notFound('Station not found or is no longer active');
+function toDate(value: string | Date | undefined): Date | undefined {
+  if (!value) return undefined;
+  return value instanceof Date ? value : new Date(value);
+}
+
+function userObjectId(value: string): Types.ObjectId {
+  return new Types.ObjectId(value);
+}
+
+function isPrivilegedViewer(viewer?: ViewerContext): boolean {
+  return Boolean(viewer && ['admin', 'moderator'].includes(viewer.role));
+}
+
+function canManageReport(report: Pick<ISolarReport, 'submittedBy'>, viewer: ViewerContext): boolean {
+  return report.submittedBy.toString() === viewer._id || isPrivilegedViewer(viewer);
+}
+
+function canViewReport(
+  report: Pick<ISolarReport, 'submittedBy' | 'status' | 'isPublic' | 'isActive'>,
+  viewer?: ViewerContext,
+): boolean {
+  if (!report.isActive) return false;
+  if (isPrivilegedViewer(viewer)) return true;
+  if (viewer && report.submittedBy.toString() === viewer._id) return true;
+  return report.status === 'published' && report.isPublic === true;
+}
+
+function roundMetric(value: number | null | undefined): number {
+  if (!value) return 0;
+  return Number(value.toFixed(2));
+}
+
+function isTransactionUnsupportedError(error: unknown): boolean {
+  const message = (error as { message?: string })?.message ?? '';
+  return message.includes('replica set') || message.includes('Transaction numbers');
+}
+
+async function runWithOptionalTransaction<T>(
+  operation: (session?: mongoose.ClientSession) => Promise<T>,
+): Promise<T> {
+  const session = await mongoose.startSession();
+
+  try {
+    let result!: T;
+    await session.withTransaction(async () => {
+      result = await operation(session);
+    });
+    return result;
+  } catch (error) {
+    if (isTransactionUnsupportedError(error)) {
+      logger.warn('Solar service: transactions unsupported on this MongoDB instance — falling back to non-transactional execution');
+      return operation();
+    }
+    throw error;
+  } finally {
+    await session.endSession();
   }
+}
+
+function buildAnalyticsEmptyState(): StationAnalytics {
+  return {
+    hasData: false,
+    overview: {
+      totalReports: 0,
+      avgSolarScore: 0,
+      avgEstimatedOutputKw: 0,
+      avgActualOutputKw: 0,
+      avgAccuracyPct: 0,
+      maxSolarScore: 0,
+      minSolarScore: 0,
+    },
+    byDayOfWeek: [],
+    byHourOfDay: [],
+    accuracyDistribution: [],
+    last30Days: [],
+  };
+}
+
+async function findActiveStation(stationId: string) {
+  const station = await Station.findById(stationId).lean();
+  if (!station || !station.isActive || station.status !== 'active') {
+    throw ApiError.notFound('Station not found');
+  }
+
+  return station;
+}
+
+export async function createReport(dto: CreateReportDto, userId: string): Promise<ISolarReport> {
+  const station = await findActiveStation(dto.stationId);
+  const visitedDate = toDate(dto.visitedAt) ?? new Date();
+  const dayStart = new Date(visitedDate);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
   const [lng, lat] = extractCoords(station);
+  const weather = await solarWeatherService.getCurrentWeather(lat, lng);
+  const calc = calculateSolarOutput(station.solarPanelKw, weather);
 
-  // Fetch weather — degrades gracefully if OWM is down (503 propagated)
-  let weatherSnapshot: WeatherSnapshot;
-  try {
-    weatherSnapshot = await solarWeatherService.getCurrentWeather(lat, lng);
-  } catch (err) {
-    // If OWM is down, we cannot compute estimatedOutputKw — block submission
-    logger.warn('createReport: OWM unavailable', { err, stationId: dto.stationId });
-    throw err;
-  }
+  const report = await runWithOptionalTransaction(async (session) => {
+    const existingTodayQuery = SolarReport.findOne({
+      station: dto.stationId,
+      submittedBy: userId,
+      visitedAt: { $gte: dayStart, $lte: dayEnd },
+      isActive: true,
+    });
+    const existingToday = session
+      ? await existingTodayQuery.session(session).lean()
+      : await existingTodayQuery.lean();
 
-  const calc = calculateSolarOutput(station.solarPanelKw, weatherSnapshot);
+    if (existingToday) {
+      throw ApiError.conflict('You have already submitted a solar report for this station today.');
+    }
 
-  const report = new SolarReport({
-    station:    new Types.ObjectId(dto.stationId),
-    submittedBy: new Types.ObjectId(userId),
-    visitedAt:  dto.visitedAt ? new Date(dto.visitedAt) : new Date(),
-    weatherSnapshot: {
-      cloudCoverPct:  weatherSnapshot.cloudCoverPct,
-      uvIndex:        weatherSnapshot.uvIndex,
-      temperatureC:   weatherSnapshot.temperatureC,
-      windSpeedKph:   weatherSnapshot.windSpeedKph,
-      weatherMain:    weatherSnapshot.weatherMain,
-      weatherIcon:    weatherSnapshot.weatherIcon,
-      capturedAt:     weatherSnapshot.capturedAt,
-      isFallback:     weatherSnapshot.isFallback ?? false,
-    },
-    estimatedOutputKw: calc.estimatedOutputKw,
-    solarScore:        calc.solarScore,
-    actualOutputKw:    dto.actualOutputKw ?? null,
-    notes:             dto.notes ?? null,
-    isPublic:          dto.isPublic ?? true,
-    status:            'draft',
+    const [created] = session
+      ? await SolarReport.create([
+        {
+          station: dto.stationId,
+          submittedBy: userId,
+          visitedAt: visitedDate,
+          weatherSnapshot: {
+            cloudCoverPct: weather.cloudCoverPct,
+            uvIndex: weather.uvIndex,
+            temperatureC: weather.temperatureC,
+            windSpeedKph: weather.windSpeedKph,
+            weatherMain: weather.weatherMain,
+            weatherIcon: weather.weatherIcon,
+            capturedAt: weather.capturedAt,
+            isFallback: weather.isFallback ?? false,
+          },
+          estimatedOutputKw: calc.estimatedOutputKw,
+          actualOutputKw: dto.actualOutputKw ?? null,
+          solarScore: calc.solarScore,
+          notes: dto.notes ?? null,
+          isPublic: dto.isPublic ?? true,
+          status: 'published',
+        },
+      ], { session })
+      : await SolarReport.create([
+        {
+          station: dto.stationId,
+          submittedBy: userId,
+          visitedAt: visitedDate,
+          weatherSnapshot: {
+            cloudCoverPct: weather.cloudCoverPct,
+            uvIndex: weather.uvIndex,
+            temperatureC: weather.temperatureC,
+            windSpeedKph: weather.windSpeedKph,
+            weatherMain: weather.weatherMain,
+            weatherIcon: weather.weatherIcon,
+            capturedAt: weather.capturedAt,
+            isFallback: weather.isFallback ?? false,
+          },
+          estimatedOutputKw: calc.estimatedOutputKw,
+          actualOutputKw: dto.actualOutputKw ?? null,
+          solarScore: calc.solarScore,
+          notes: dto.notes ?? null,
+          isPublic: dto.isPublic ?? true,
+          status: 'published',
+        },
+      ]);
+
+    if (session) {
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.create',
+          resource: 'solar_report',
+          resourceId: created._id,
+          after: {
+            stationId: dto.stationId,
+            isPublic: created.isPublic,
+            status: created.status,
+            solarScore: created.solarScore,
+          },
+        },
+      ], { session });
+    } else {
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.create',
+          resource: 'solar_report',
+          resourceId: created._id,
+          after: {
+            stationId: dto.stationId,
+            isPublic: created.isPublic,
+            status: created.status,
+            solarScore: created.solarScore,
+          },
+        },
+      ]);
+    }
+
+    return created;
   });
 
-  await report.save();
+  logger.info('createReport: solar report created', {
+    reportId: report._id,
+    stationId: dto.stationId,
+    userId,
+  });
+
+  report.accuracyLabel = getAccuracyLabel(report.accuracyPct);
   return report;
 }
 
-/**
- * GET /api/solar/reports
- *
- * Supports filtering by stationId, submittedBy, status, isPublic, date range.
- * Default page: 1, limit: 10, sort: newest.
- */
-export async function getReports(query: ReportQuery): Promise<PaginatedResult<ISolarReport>> {
-  const page  = Math.max(1, query.page  ?? 1);
+export async function getReports(
+  query: ReportQuery,
+  viewer?: ViewerContext,
+): Promise<PaginatedResult<ISolarReport>> {
+  const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(50, Math.max(1, query.limit ?? 10));
-  const skip  = (page - 1) * limit;
+  const skip = (page - 1) * limit;
+  const requestedUserId = query.userId ?? query.submittedBy;
 
-  const filter: Record<string, unknown> = { isDeleted: false };
+  const filter: Record<string, unknown> = { isActive: true };
 
-  if (query.stationId)   filter['station']     = new Types.ObjectId(query.stationId);
-  if (query.submittedBy) filter['submittedBy']  = new Types.ObjectId(query.submittedBy);
-  if (query.status)      filter['status']       = query.status;
+  if (query.stationId) filter['station'] = new Types.ObjectId(query.stationId);
+  if (requestedUserId) filter['submittedBy'] = new Types.ObjectId(requestedUserId);
+  if (query.status) filter['status'] = query.status;
   if (query.isPublic !== undefined) filter['isPublic'] = query.isPublic;
+  if (query.minScore !== undefined) filter['solarScore'] = { $gte: query.minScore };
 
-  if (query.from || query.to) {
+  const dateFrom = toDate(query.dateFrom ?? query.from);
+  const dateTo = toDate(query.dateTo ?? query.to);
+  if (dateFrom || dateTo) {
     const range: Record<string, Date> = {};
-    if (query.from) range['$gte'] = new Date(query.from);
-    if (query.to)   range['$lte'] = new Date(query.to);
+    if (dateFrom) range['$gte'] = dateFrom;
+    if (dateTo) range['$lte'] = dateTo;
     filter['visitedAt'] = range;
+  }
+
+  if (isPrivilegedViewer(viewer)) {
+    // full visibility for moderators/admins
+  } else if (viewer?._id && requestedUserId === viewer._id) {
+    // own report management view
+  } else if (viewer?._id) {
+    filter['$or'] = [
+      { status: 'published', isPublic: true },
+      { submittedBy: new Types.ObjectId(viewer._id) },
+    ];
+  } else {
+    filter['status'] = 'published';
+    filter['isPublic'] = true;
   }
 
   const sortMap: Record<string, Record<string, 1 | -1>> = {
     newest: { visitedAt: -1 },
-    oldest: { visitedAt:  1 },
-    score:  { solarScore: -1 },
+    oldest: { visitedAt: 1 },
+    'highest-score': { solarScore: -1 },
+    'most-accurate': { accuracyPct: -1 },
+    score: { solarScore: -1 },
   };
   const sort = sortMap[query.sort ?? 'newest'] ?? sortMap['newest'];
 
@@ -209,15 +388,19 @@ export async function getReports(query: ReportQuery): Promise<PaginatedResult<IS
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .populate('station',     'name solarPanelKw')
-      .populate('submittedBy', 'displayName')
+      .populate('station', 'name solarPanelKw address.city')
+      .populate('submittedBy', 'displayName avatarUrl')
       .lean(),
     SolarReport.countDocuments(filter),
   ]);
 
   const totalPages = Math.ceil(total / limit);
+
   return {
-    data: data as ISolarReport[],
+    data: data.map((report) => ({
+      ...(report as unknown as ISolarReport),
+      accuracyLabel: getAccuracyLabel((report as ISolarReport).accuracyPct),
+    })),
     pagination: {
       page,
       limit,
@@ -229,259 +412,421 @@ export async function getReports(query: ReportQuery): Promise<PaginatedResult<IS
   };
 }
 
-/**
- * GET /api/solar/reports/:id
- */
-export async function getReportById(id: string): Promise<ISolarReport> {
+export async function getReportById(id: string, viewer?: ViewerContext): Promise<ISolarReport> {
   if (!Types.ObjectId.isValid(id)) {
     throw ApiError.badRequest('Invalid report id');
   }
 
-  const report = await SolarReport.findOne({ _id: id, isDeleted: false })
-    .populate('station',     'name solarPanelKw location')
-    .populate('submittedBy', 'displayName');
+  const report = await SolarReport.findOne({ _id: id, isActive: true })
+    .populate('station', 'name solarPanelKw address.city location')
+    .populate('submittedBy', 'displayName avatarUrl');
 
-  if (!report) {
+  if (!report || !canViewReport(report, viewer)) {
     throw ApiError.notFound('Solar report not found');
   }
+
+  report.accuracyLabel = getAccuracyLabel(report.accuracyPct);
   return report;
 }
 
-/**
- * PUT /api/solar/reports/:id
- *
- * Only the report owner may edit; admin can edit any.
- * If actualOutputKw is updated the pre-save hook recalculates accuracyPct.
- */
 export async function updateReport(
   id: string,
   dto: UpdateReportDto,
   userId: string,
   userRole: string,
 ): Promise<ISolarReport> {
-  const report = await SolarReport.findOne({ _id: id, isDeleted: false });
-  if (!report) throw ApiError.notFound('Solar report not found');
+  const updatedReport = await runWithOptionalTransaction(async (session) => {
+    const reportQuery = SolarReport.findOne({ _id: id, isActive: true });
+    const report = session ? await reportQuery.session(session) : await reportQuery;
+    if (!report) throw ApiError.notFound('Solar report not found');
+    if (!canManageReport(report, { _id: userId, role: userRole })) {
+      throw ApiError.forbidden('You can only edit your own reports.');
+    }
 
-  const isAdmin = ['admin', 'moderator'].includes(userRole);
-  const isOwner = report.submittedBy.toString() === userId;
-  if (!isOwner && !isAdmin) {
-    throw ApiError.forbidden('You do not have permission to edit this report');
-  }
+    const before = {
+      actualOutputKw: report.actualOutputKw,
+      notes: report.notes,
+      isPublic: report.isPublic,
+    };
 
-  if (dto.actualOutputKw !== undefined) report.actualOutputKw = dto.actualOutputKw ?? null;
-  if (dto.notes          !== undefined) report.notes          = dto.notes ?? null;
-  if (dto.isPublic       !== undefined) report.isPublic       = dto.isPublic;
+    if (dto.actualOutputKw !== undefined) report.actualOutputKw = dto.actualOutputKw ?? null;
+    if (dto.notes !== undefined) report.notes = dto.notes ?? null;
+    if (dto.isPublic !== undefined) report.isPublic = dto.isPublic;
 
-  await report.save();  // pre-save hook recalculates accuracyPct
-  return report;
+    if (session) {
+      await report.save({ session });
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.update',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before,
+          after: {
+            actualOutputKw: report.actualOutputKw,
+            notes: report.notes,
+            isPublic: report.isPublic,
+          },
+        },
+      ], { session });
+    } else {
+      await report.save();
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.update',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before,
+          after: {
+            actualOutputKw: report.actualOutputKw,
+            notes: report.notes,
+            isPublic: report.isPublic,
+          },
+        },
+      ]);
+    }
+
+    return report;
+  });
+
+  updatedReport.accuracyLabel = getAccuracyLabel(updatedReport.accuracyPct);
+  return updatedReport;
 }
 
-/**
- * DELETE /api/solar/reports/:id
- *
- * Soft-delete — sets isDeleted + deletedAt so analytics remain stable.
- * Owner or admin only.
- */
 export async function deleteReport(id: string, userId: string, userRole: string): Promise<void> {
-  const report = await SolarReport.findOne({ _id: id, isDeleted: false });
-  if (!report) throw ApiError.notFound('Solar report not found');
+  await runWithOptionalTransaction(async (session) => {
+    const reportQuery = SolarReport.findOne({ _id: id, isActive: true });
+    const report = session ? await reportQuery.session(session) : await reportQuery;
+    if (!report) throw ApiError.notFound('Solar report not found');
+    if (!canManageReport(report, { _id: userId, role: userRole })) {
+      throw ApiError.forbidden('You can only delete your own reports.');
+    }
 
-  const isAdmin = ['admin', 'moderator'].includes(userRole);
-  const isOwner = report.submittedBy.toString() === userId;
-  if (!isOwner && !isAdmin) {
-    throw ApiError.forbidden('You do not have permission to delete this report');
-  }
+    report.isActive = false;
+    report.deletedAt = new Date();
+    report.deletedBy = userObjectId(userId);
 
-  report.isDeleted = true;
-  report.deletedAt = new Date();
-  report.isActive  = false;
-  await report.save();
+    if (session) {
+      await report.save({ session });
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.delete',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before: { status: report.status, isPublic: report.isPublic },
+          after: { isActive: false },
+        },
+      ], { session });
+    } else {
+      await report.save();
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.delete',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before: { status: report.status, isPublic: report.isPublic },
+          after: { isActive: false },
+        },
+      ]);
+    }
+  });
+
+  logger.info('deleteReport: solar report soft-deleted', { reportId: id, deletedBy: userId });
 }
 
-/**
- * PATCH /api/solar/reports/:id/publish
- *
- * Transitions status: 'draft' → 'published'.
- * Already-published reports return 400 to prevent duplicate publications.
- * Owner or admin only.
- */
 export async function publishReport(id: string, userId: string, userRole: string): Promise<ISolarReport> {
-  const report = await SolarReport.findOne({ _id: id, isDeleted: false });
-  if (!report) throw ApiError.notFound('Solar report not found');
+  const publishedReport = await runWithOptionalTransaction(async (session) => {
+    const reportQuery = SolarReport.findOne({ _id: id, isActive: true });
+    const report = session ? await reportQuery.session(session) : await reportQuery;
+    if (!report) throw ApiError.notFound('Solar report not found');
+    if (!canManageReport(report, { _id: userId, role: userRole })) {
+      throw ApiError.forbidden('You can only publish your own reports.');
+    }
 
-  if (report.status === 'published') {
-    throw ApiError.badRequest('Report is already published');
-  }
+    if (report.status === 'published') {
+      throw ApiError.badRequest('Report is already published.');
+    }
 
-  const isAdmin = ['admin', 'moderator'].includes(userRole);
-  const isOwner = report.submittedBy.toString() === userId;
-  if (!isOwner && !isAdmin) {
-    throw ApiError.forbidden('You do not have permission to publish this report');
-  }
+    if (report.status === 'archived' && !isPrivilegedViewer({ _id: userId, role: userRole })) {
+      throw ApiError.forbidden('Only moderators and admins can restore archived reports.');
+    }
 
-  report.status = 'published';
-  await report.save();
-  return report;
+    const previousStatus = report.status;
+    report.status = 'published';
+
+    if (session) {
+      await report.save({ session });
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.publish',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before: { status: previousStatus },
+          after: { status: 'published' },
+        },
+      ], { session });
+    } else {
+      await report.save();
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.publish',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before: { status: previousStatus },
+          after: { status: 'published' },
+        },
+      ]);
+    }
+
+    return report;
+  });
+
+  publishedReport.accuracyLabel = getAccuracyLabel(publishedReport.accuracyPct);
+  logger.info('publishReport: solar report published', { reportId: id, publishedBy: userId });
+  return publishedReport;
 }
 
-/**
- * GET /api/solar/stations/:stationId/analytics
- *
- * Aggregation pipeline — the SHOWCASE function.
- *
- * Returns:
- *   hasData            — false when no published reports exist for this station
- *   reportCount        — total published + active reports
- *   avgSolarScore      — mean solarScore across reports
- *   avgAccuracyPct     — mean accuracyPct (null-safe — skips docs without a reading)
- *   avgEstimatedOutputKw — mean estimatedOutputKw
- *   avgActualOutputKw  — mean actualOutputKw across docs that have one
- *   last30Days         — daily roll-up for sparkline chart
- */
+export async function archiveReport(id: string, userId: string, userRole: string): Promise<ISolarReport> {
+  if (!isPrivilegedViewer({ _id: userId, role: userRole })) {
+    throw ApiError.forbidden('Only moderators and admins can archive solar reports');
+  }
+
+  const archivedReport = await runWithOptionalTransaction(async (session) => {
+    const reportQuery = SolarReport.findOne({ _id: id, isActive: true });
+    const report = session ? await reportQuery.session(session) : await reportQuery;
+    if (!report) throw ApiError.notFound('Solar report not found');
+    if (report.status === 'archived') {
+      throw ApiError.badRequest('Report is already archived');
+    }
+
+    const beforeStatus = report.status;
+    report.status = 'archived';
+
+    if (session) {
+      await report.save({ session });
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.archive',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before: { status: beforeStatus },
+          after: { status: 'archived' },
+        },
+      ], { session });
+    } else {
+      await report.save();
+      await AuditLog.create([
+        {
+          actor: userObjectId(userId),
+          action: 'solar.report.archive',
+          resource: 'solar_report',
+          resourceId: report._id,
+          before: { status: beforeStatus },
+          after: { status: 'archived' },
+        },
+      ]);
+    }
+
+    return report;
+  });
+
+  archivedReport.accuracyLabel = getAccuracyLabel(archivedReport.accuracyPct);
+  logger.info('archiveReport: solar report archived', { reportId: id, archivedBy: userId });
+  return archivedReport;
+}
+
 export async function getStationAnalytics(stationId: string): Promise<StationAnalytics> {
   if (!Types.ObjectId.isValid(stationId)) {
     throw ApiError.badRequest('Invalid station id');
   }
 
   const stationOid = new Types.ObjectId(stationId);
-
-  const [summary, last30Days] = await Promise.all([
-    // ── Summary aggregation ────────────────────────────────────────────────
-    SolarReport.aggregate<{
-      _id:         null;
-      reportCount: number;
-      avgScore:    number;
-      avgAccuracy: number | null;
-      avgEstKw:    number;
-      avgActKw:    number | null;
-    }>([
-      {
-        $match: {
-          station:   stationOid,
-          status:    'published',
-          isPublic:  true,
-          isDeleted: false,
-        },
+  const [result] = await SolarReport.aggregate<{
+    overview: Array<{
+      _id: null;
+      totalReports: number;
+      avgSolarScore: number;
+      avgEstimatedOutputKw: number;
+      avgActualOutputKw: number;
+      avgAccuracyPct: number;
+      maxSolarScore: number;
+      minSolarScore: number;
+    }>;
+    byDayOfWeek: Array<{ _id: number; avgScore: number; count: number }>;
+    byHourOfDay: Array<{ _id: number; avgScore: number; count: number }>;
+    accuracyDistribution: Array<{ _id: number | string; count: number; avgScore: number }>;
+    last30Days: Array<{ _id: string; avgScore: number; reportCount: number }>;
+  }>([
+    {
+      $match: {
+        station: stationOid,
+        isActive: true,
+        status: 'published',
+        isPublic: true,
       },
-      {
-        $group: {
-          _id:         null,
-          reportCount: { $sum: 1 },
-          avgScore:    { $avg: '$solarScore' },
-          avgAccuracy: { $avg: '$accuracyPct' },          // $avg skips nulls natively
-          avgEstKw:    { $avg: '$estimatedOutputKw' },
-          avgActKw:    { $avg: '$actualOutputKw' },       // $avg skips nulls natively
-        },
+    },
+    {
+      $facet: {
+        overview: [
+          {
+            $group: {
+              _id: null,
+              totalReports: { $sum: 1 },
+              avgSolarScore: { $avg: '$solarScore' },
+              avgEstimatedOutputKw: { $avg: '$estimatedOutputKw' },
+              avgActualOutputKw: { $avg: '$actualOutputKw' },
+              avgAccuracyPct: { $avg: '$accuracyPct' },
+              maxSolarScore: { $max: '$solarScore' },
+              minSolarScore: { $min: '$solarScore' },
+            },
+          },
+        ],
+        byDayOfWeek: [
+          {
+            $group: {
+              _id: { $dayOfWeek: '$visitedAt' },
+              avgScore: { $avg: '$solarScore' },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ],
+        byHourOfDay: [
+          {
+            $group: {
+              _id: { $hour: '$visitedAt' },
+              avgScore: { $avg: '$solarScore' },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ],
+        accuracyDistribution: [
+          { $match: { accuracyPct: { $ne: null } } },
+          {
+            $bucket: {
+              groupBy: '$accuracyPct',
+              boundaries: [0, 50, 70, 90, 110, 130, 201],
+              default: 'Other',
+              output: {
+                count: { $sum: 1 },
+                avgScore: { $avg: '$solarScore' },
+              },
+            },
+          },
+        ],
+        last30Days: [
+          {
+            $match: {
+              visitedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+            },
+          },
+          {
+            $group: {
+              _id: { $dateToString: { format: '%Y-%m-%d', date: '$visitedAt' } },
+              avgScore: { $avg: '$solarScore' },
+              reportCount: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ],
       },
-    ]),
-
-    // ── Last 30 days daily roll-up ─────────────────────────────────────────
-    SolarReport.aggregate<DayAggregate>([
-      {
-        $match: {
-          station:   stationOid,
-          status:    'published',
-          isPublic:  true,
-          isDeleted: false,
-          visitedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-        },
-      },
-      {
-        $group: {
-          _id:         { $dateToString: { format: '%Y-%m-%d', date: '$visitedAt' } },
-          avgScore:    { $avg: '$solarScore' },
-          reportCount: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]),
+    },
   ]);
 
-  if (!summary.length) {
-    return {
-      hasData:              false,
-      reportCount:          0,
-      avgSolarScore:        0,
-      avgAccuracyPct:       null,
-      avgEstimatedOutputKw: 0,
-      avgActualOutputKw:    null,
-      last30Days:           [],
-    };
+  if (!result?.overview?.length || result.overview[0].totalReports === 0) {
+    return buildAnalyticsEmptyState();
   }
 
-  const s = summary[0];
+  const overview = result.overview[0];
   return {
-    hasData:              true,
-    reportCount:          s.reportCount,
-    avgSolarScore:        Math.round((s.avgScore ?? 0) * 100) / 100,
-    avgAccuracyPct:       s.avgAccuracy !== null ? Math.round((s.avgAccuracy ?? 0) * 100) / 100 : null,
-    avgEstimatedOutputKw: Math.round((s.avgEstKw ?? 0) * 100) / 100,
-    avgActualOutputKw:    s.avgActKw !== null    ? Math.round((s.avgActKw ?? 0) * 100) / 100 : null,
-    last30Days:           last30Days.map((d) => ({
-      _id:         d._id,
-      avgScore:    Math.round((d.avgScore ?? 0) * 100) / 100,
-      reportCount: d.reportCount,
+    hasData: true,
+    overview: {
+      totalReports: overview.totalReports,
+      avgSolarScore: roundMetric(overview.avgSolarScore),
+      avgEstimatedOutputKw: roundMetric(overview.avgEstimatedOutputKw),
+      avgActualOutputKw: roundMetric(overview.avgActualOutputKw),
+      avgAccuracyPct: roundMetric(overview.avgAccuracyPct),
+      maxSolarScore: roundMetric(overview.maxSolarScore),
+      minSolarScore: roundMetric(overview.minSolarScore),
+    },
+    byDayOfWeek: result.byDayOfWeek.map((item) => ({
+      _id: item._id,
+      avgScore: roundMetric(item.avgScore),
+      count: item.count,
+    })),
+    byHourOfDay: result.byHourOfDay.map((item) => ({
+      _id: item._id,
+      avgScore: roundMetric(item.avgScore),
+      count: item.count,
+    })),
+    accuracyDistribution: result.accuracyDistribution.map((item) => ({
+      _id: item._id,
+      count: item.count,
+      avgScore: roundMetric(item.avgScore),
+    })),
+    last30Days: result.last30Days.map((item) => ({
+      _id: item._id,
+      avgScore: roundMetric(item.avgScore),
+      reportCount: item.reportCount,
     })),
   };
 }
 
-/**
- * GET /api/solar/stations/:stationId/live-weather
- *
- * Returns the station's live weather annotated with solar output prediction.
- */
 export async function getLiveWeather(stationId: string): Promise<LiveWeatherResponse> {
-  const station = await Station.findById(stationId).lean();
-  if (!station || !station.isActive) {
-    throw ApiError.notFound('Station not found or is no longer active');
-  }
-
+  const station = await findActiveStation(stationId);
   const [lng, lat] = extractCoords(station);
-  const weather    = await solarWeatherService.getCurrentWeather(lat, lng);
-  const calc       = calculateSolarOutput(station.solarPanelKw, weather);
+  const weather = await solarWeatherService.getCurrentWeather(lat, lng);
+  const calc = calculateSolarOutput(station.solarPanelKw, weather);
 
   return {
-    stationId:         stationId,
-    stationName:       station.name,
-    solarPanelKw:      station.solarPanelKw,
+    station: {
+      _id: stationId,
+      name: station.name,
+      solarPanelKw: station.solarPanelKw,
+      address: { city: station.address?.city ?? null },
+    },
     weather,
-    estimatedOutputKw: calc.estimatedOutputKw,
-    solarScore:        calc.solarScore,
+    solar: {
+      estimatedOutputKw: calc.estimatedOutputKw,
+      solarScore: calc.solarScore,
+      cloudFactor: calc.cloudFactor,
+      uvFactor: calc.uvFactor,
+    },
+    generatedAt: new Date(),
   };
 }
 
-/**
- * GET /api/solar/stations/:stationId/forecast
- *
- * Returns the 5-day / 3-hourly forecast with solar annotations + top 3 windows.
- */
 export async function getForecastWithSolar(stationId: string): Promise<ForecastWithSolarResponse> {
-  const station = await Station.findById(stationId).lean();
-  if (!station || !station.isActive) {
-    throw ApiError.notFound('Station not found or is no longer active');
-  }
-
+  const station = await findActiveStation(stationId);
   const [lng, lat] = extractCoords(station);
-  const rawSlots   = await solarWeatherService.getForecast(lat, lng);
-
-  // Annotate each slot with solar calculation
-  const annotated: ForecastSlot[] = rawSlots.map((slot) => {
+  const rawForecast = await solarWeatherService.getForecast(lat, lng);
+  const forecast = rawForecast.map((slot) => {
     const calc = calculateSolarOutput(station.solarPanelKw, slot);
-    return { ...slot, estimatedOutputKw: calc.estimatedOutputKw, solarScore: calc.solarScore };
+    return {
+      ...slot,
+      estimatedOutputKw: calc.estimatedOutputKw,
+      solarScore: calc.solarScore,
+    };
   });
 
-  const bestWindows = getBestChargingWindows(annotated, station.solarPanelKw);
-
   return {
-    stationId,
-    stationName:  station.name,
-    solarPanelKw: station.solarPanelKw,
-    forecast:     annotated,
-    bestWindows,
+    station: {
+      _id: stationId,
+      name: station.name,
+      solarPanelKw: station.solarPanelKw,
+    },
+    forecast,
+    bestWindows: getBestChargingWindows(forecast, station.solarPanelKw),
+    generatedAt: new Date(),
   };
 }
-
-// ── Default export (service object) ──────────────────────────────────────────
 
 const solarService = {
   createReport,
@@ -490,6 +835,7 @@ const solarService = {
   updateReport,
   deleteReport,
   publishReport,
+  archiveReport,
   getStationAnalytics,
   getLiveWeather,
   getForecastWithSolar,
