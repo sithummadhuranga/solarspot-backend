@@ -13,7 +13,8 @@
  */
 
 import { Router }          from 'express';
-import { protect }         from '@middleware/auth.middleware';
+import { optionalAuth, protect } from '@middleware/auth.middleware';
+import { checkPermission } from '@middleware/rbac.middleware';
 import { validate }        from '@middleware/validate.middleware';
 import * as SolarController from './solar.controller';
 import * as V               from './solar.validation';
@@ -63,6 +64,7 @@ router.get(
 router.get(
   '/reports',
   validate(V.getReportsSchema, 'query'),
+  optionalAuth,
   SolarController.getReports,
 );
 
@@ -73,6 +75,7 @@ router.get(
 router.post(
   '/reports',
   protect,
+  checkPermission('reviews.create'),
   validate(V.createReportSchema),
   SolarController.createReport,
 );
@@ -84,6 +87,7 @@ router.post(
  */
 router.get(
   '/reports/:id',
+  optionalAuth,
   validate(V.reportIdParamSchema, 'params'),
   SolarController.getReportById,
 );
@@ -94,6 +98,7 @@ router.get(
 router.put(
   '/reports/:id',
   protect,
+  checkPermission('reviews.create'),
   validate(V.reportIdParamSchema, 'params'),
   validate(V.updateReportSchema),
   SolarController.updateReport,
@@ -105,6 +110,7 @@ router.put(
 router.delete(
   '/reports/:id',
   protect,
+  checkPermission('reviews.create'),
   validate(V.reportIdParamSchema, 'params'),
   SolarController.deleteReport,
 );
@@ -116,8 +122,21 @@ router.delete(
 router.patch(
   '/reports/:id/publish',
   protect,
+  checkPermission('reviews.create'),
   validate(V.reportIdParamSchema, 'params'),
   SolarController.publishReport,
+);
+
+/**
+ * PATCH /api/solar/reports/:id/archive
+ * Admin/moderator only — transitions a report to archived status.
+ */
+router.patch(
+  '/reports/:id/archive',
+  protect,
+  checkPermission('weather.admin'),
+  validate(V.reportIdParamSchema, 'params'),
+  SolarController.archiveReport,
 );
 
 export default router;

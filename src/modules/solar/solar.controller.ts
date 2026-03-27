@@ -25,8 +25,8 @@ import type { CreateReportDto, UpdateReportDto, ReportQuery } from './solar.serv
  *     summary: Live weather + solar output prediction for a station
  *     description: >
  *       Returns real-time weather conditions for the station's location, annotated
- *       with the estimated solar panel output in kW and a 0–10 solar quality score.
- *       Responses are cached for 30 minutes. UV index is estimated from cloud cover
+ *       with the estimated solar panel output in kW and a 0–100 solar quality score.
+ *       Responses are cached for 15 minutes. UV index is estimated from cloud cover
  *       when not provided by the OWM free tier.
  *     tags: [Solar Intelligence]
  *     parameters:
@@ -69,7 +69,7 @@ export const getLiveWeather = asyncHandler(async (req: AuthRequest, res: Respons
  *   get:
  *     summary: 5-day solar forecast with best charging windows
  *     description: >
- *       Returns 40 three-hourly forecast slots (5 days), each annotated with
+ *       Returns up to 16 three-hourly forecast slots, each annotated with
  *       an estimated solar output in kW and a solar score. Also returns the top
  *       3 best charging windows (daytime, highest solar score).
  *     tags: [Solar Intelligence]
@@ -168,10 +168,10 @@ export const getStationAnalytics = asyncHandler(async (req: AuthRequest, res: Re
  *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
  *       - in: query
  *         name: status
- *         schema: { type: string, enum: [draft, published] }
+ *         schema: { type: string, enum: [draft, published, archived] }
  *       - in: query
  *         name: sort
- *         schema: { type: string, enum: [newest, oldest, score], default: newest }
+ *         schema: { type: string, enum: [newest, oldest, highest-score, most-accurate, score], default: newest }
  *       - in: query
  *         name: page
  *         schema: { type: integer, minimum: 1, default: 1 }
@@ -201,7 +201,10 @@ export const getStationAnalytics = asyncHandler(async (req: AuthRequest, res: Re
  *     x-component: solar
  */
 export const getReports = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const result = await solarService.getReports(req.query as unknown as ReportQuery);
+  const result = await solarService.getReports(
+    req.query as unknown as ReportQuery,
+    req.user ? { _id: req.user._id, role: req.user.role } : undefined,
+  );
   ApiResponse.paginated(res, result.data, result.pagination, 'Reports fetched');
 });
 
@@ -236,7 +239,10 @@ export const getReports = asyncHandler(async (req: AuthRequest, res: Response) =
  *     x-component: solar
  */
 export const getReportById = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const report = await solarService.getReportById(req.params['id'] as string);
+  const report = await solarService.getReportById(
+    req.params['id'] as string,
+    req.user ? { _id: req.user._id, role: req.user.role } : undefined,
+  );
   ApiResponse.success(res, report);
 });
 
@@ -415,4 +421,49 @@ export const publishReport = asyncHandler(async (req: AuthRequest, res: Response
     req.user!.role,
   );
   ApiResponse.success(res, report, 'Report published');
+});
+
+/**
+ * @swagger
+ * /api/solar/reports/{id}/archive:
+ *   patch:
+ *     summary: Archive a solar report (admin/moderator only)
+ *     description: >
+ *       Transitions a report to 'archived' status. Archived reports are removed
+ *       from public analytics and station summaries but are preserved for auditing.
+ *       Only moderators and admins can archive reports.
+ *     tags: [Solar Intelligence]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+ *     responses:
+ *       200:
+ *         description: Report archived
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/SolarReport' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *     x-permission: weather.admin
+ *     x-policies: [email_verified_only, active_account_only]
+ *     x-min-role: 3
+ *     x-component: solar
+ */
+export const archiveReport = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const report = await solarService.archiveReport(
+    req.params['id'] as string,
+    req.user!._id,
+    req.user!.role,
+  );
+  ApiResponse.success(res, report, 'Report archived');
 });
