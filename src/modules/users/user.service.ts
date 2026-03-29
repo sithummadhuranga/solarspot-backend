@@ -18,12 +18,25 @@ import type {
   PaginationResult,
 } from '@/types';
 
+function serializeRoleForClient(user: Record<string, unknown>): IUser {
+  const roleValue = user.role;
+  if (!roleValue || typeof roleValue !== 'object') {
+    return user as unknown as IUser;
+  }
+
+  const role = roleValue as Record<string, unknown>;
+  return {
+    ...user,
+    role: typeof role.name === 'string' ? role.name : String(role._id ?? ''),
+  } as unknown as IUser;
+}
+
 class UserService {
   /** GET /users/me — return the authenticated user's profile. */
   async getMe(userId: string): Promise<IUser> {
     const user = await User.findById(userId).populate('role').lean();
     if (!user) throw ApiError.notFound('User not found');
-    return user as IUser;
+    return serializeRoleForClient(user as unknown as Record<string, unknown>);
   }
 
   /** PUT /users/me — update own profile. */
@@ -32,10 +45,10 @@ class UserService {
       userId,
       { $set: input },
       { returnDocument: 'after', runValidators: true },
-    ).populate('role');
+    ).populate('role').lean();
 
     if (!user) throw ApiError.notFound('User not found');
-    return user as IUser;
+    return serializeRoleForClient(user as unknown as Record<string, unknown>);
   }
 
   /** DELETE /users/me — soft-delete own account. */

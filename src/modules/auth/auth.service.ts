@@ -62,6 +62,30 @@ function generateSecureToken(): string {
 }
 
 export class AuthService {
+  private serializeUserForClient(user: unknown): Record<string, unknown> {
+    const value = user as {
+      toJSON?: () => Record<string, unknown>;
+      toObject?: () => Record<string, unknown>;
+    };
+
+    const plain = value?.toJSON
+      ? value.toJSON()
+      : value?.toObject
+        ? value.toObject()
+        : (user as Record<string, unknown>);
+
+    const roleValue = plain.role;
+    if (!roleValue || typeof roleValue !== 'object') {
+      return plain;
+    }
+
+    const role = roleValue as Record<string, unknown>;
+    return {
+      ...plain,
+      role: typeof role.name === 'string' ? role.name : String(role._id ?? ''),
+    };
+  }
+
   /**
    * POST /api/auth/register
    * Hash password (via User model pre-save) → save user → send verify-email
@@ -184,7 +208,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: user.toJSON(),
+      user: this.serializeUserForClient(user),
     };
   }
 
@@ -235,7 +259,11 @@ export class AuthService {
     });
     // Return the user profile so the frontend can re-hydrate Redux without
     // a separate /users/me round-trip after a page refresh.
-    return { accessToken, refreshToken: newRefreshToken, user: user.toJSON() };
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: this.serializeUserForClient(user),
+    };
   }
 
   /**

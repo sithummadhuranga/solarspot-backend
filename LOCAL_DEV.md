@@ -9,7 +9,7 @@ cp .env.example .env
 Open `.env` and set at minimum:
 
 ```dotenv
-MONGODB_URI=mongodb://mongo:27017/solarspot_dev   # keep as-is for Docker
+MONGODB_URI=mongodb://mongo:27017/solarspot_dev?replicaSet=rs0   # required for transactions
 FRONTEND_URL=http://localhost:3000                 # your frontend dev URL
 JWT_SECRET=<any-32-char-string>
 JWT_REFRESH_SECRET=<any-different-32-char-string>
@@ -25,7 +25,7 @@ docker-compose up -d
 
 | Service     | URL                            |
 |-------------|-------------------------------|
-| API         | http://localhost:5000          |
+| API         | http://localhost:5001          |
 | Mongo UI    | http://localhost:8081          |
 | MongoDB     | mongodb://localhost:27017      |
 
@@ -36,7 +36,7 @@ docker-compose up -d
 In your **frontend** project set the API base URL to:
 
 ```
-http://localhost:5000/api
+http://localhost:5001/api
 ```
 
 In **this** `.env`, make sure `FRONTEND_URL` matches your frontend dev server (used for CORS):
@@ -84,6 +84,12 @@ docker exec -it solarspot_backend sh
 
 # Connect to MongoDB shell
 docker exec -it solarspot_mongo mongosh solarspot_dev
+
+# Verify replica set status (should show set: rs0)
+docker exec -it solarspot_mongo mongosh --eval "rs.status()"
+
+# If replica set was not initialized due to an old volume, reset local DB
+docker-compose down -v && docker-compose up -d
 ```
 
 ---
@@ -93,7 +99,7 @@ docker exec -it solarspot_mongo mongosh solarspot_dev
 Connect with this URI:
 
 ```
-mongodb://localhost:27017
+mongodb://localhost:27017/?replicaSet=rs0
 ```
 
 Database name: `solarspot_dev`

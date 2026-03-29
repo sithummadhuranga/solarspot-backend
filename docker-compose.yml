@@ -20,6 +20,8 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      mongo-rs-init:
+        condition: service_completed_successfully
     networks:
       - solarspot_network
 
@@ -27,6 +29,7 @@ services:
     image: mongo:7-jammy
     container_name: solarspot_mongo
     restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
     ports:
       - "27017:27017"
     volumes:
@@ -37,6 +40,29 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - solarspot_network
+
+  mongo-rs-init:
+    image: mongo:7-jammy
+    container_name: solarspot_mongo_rs_init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command:
+      - /bin/bash
+      - -lc
+      - >
+        mongosh --host mongo:27017 --eval "try {
+        const status = rs.status();
+        if (status.ok === 1) {
+        print('Replica set already initialized');
+        quit(0);
+        }
+        } catch (e) {
+        rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] });
+        }"
+    restart: "no"
     networks:
       - solarspot_network
 
