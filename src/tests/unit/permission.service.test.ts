@@ -17,7 +17,7 @@ jest.mock('@modules/permissions/role_permission.model', () => ({
   RolePermission: { find: jest.fn(), findOne: jest.fn(), deleteOne: jest.fn(), create: jest.fn() },
 }));
 jest.mock('@modules/permissions/user_permission_override.model', () => ({
-  UserPermissionOverride: { find: jest.fn(), findOneAndUpdate: jest.fn(), deleteOne: jest.fn() },
+  UserPermissionOverride: { find: jest.fn(), findOne: jest.fn(), findOneAndUpdate: jest.fn(), deleteOne: jest.fn() },
 }));
 jest.mock('@modules/permissions/audit_log.model', () => ({
   AuditLog: { find: jest.fn(), create: jest.fn().mockResolvedValue([{}]) },
@@ -105,6 +105,8 @@ describe('PermissionService.assignPermissionToRole', () => {
     const result = await PermissionService.assignPermissionToRole(
       ROLE_ID.toString(),
       PERM_ID.toString(),
+      [],
+      USER_ID.toString(),
     );
     expect(result).toBeDefined();
   });
@@ -113,7 +115,7 @@ describe('PermissionService.assignPermissionToRole', () => {
     (mockRole.findById as jest.Mock).mockResolvedValue(null);
     (mockPermission.findById as jest.Mock).mockResolvedValue({ _id: PERM_ID });
     await expect(
-      PermissionService.assignPermissionToRole('bad-role', PERM_ID.toString()),
+      PermissionService.assignPermissionToRole('bad-role', PERM_ID.toString(), [], USER_ID.toString()),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
@@ -121,7 +123,7 @@ describe('PermissionService.assignPermissionToRole', () => {
     (mockRole.findById as jest.Mock).mockResolvedValue({ _id: ROLE_ID });
     (mockPermission.findById as jest.Mock).mockResolvedValue(null);
     await expect(
-      PermissionService.assignPermissionToRole(ROLE_ID.toString(), 'bad-perm'),
+      PermissionService.assignPermissionToRole(ROLE_ID.toString(), 'bad-perm', [], USER_ID.toString()),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 });
@@ -130,14 +132,14 @@ describe('PermissionService.assignPermissionToRole', () => {
 
 describe('PermissionService.removePermissionFromRole', () => {
   it('should delete the RolePermission document', async () => {
-    const rpDoc = { _id: new Types.ObjectId(), role: ROLE_ID, permission: PERM_ID };
+    const rpDoc = { _id: new Types.ObjectId(), role: ROLE_ID, permission: PERM_ID, policies: [] };
     // First findOne call (outside transaction — check existence)
     (mockRolePerm.findOne as jest.Mock).mockResolvedValue(rpDoc as never);
     // deleteOne inside transaction needs .session() chain
     (mockRolePerm.deleteOne as jest.Mock).mockReturnValue({ session: jest.fn().mockResolvedValue({ deletedCount: 1 }) });
 
     await expect(
-      PermissionService.removePermissionFromRole(ROLE_ID.toString(), PERM_ID.toString()),
+      PermissionService.removePermissionFromRole(ROLE_ID.toString(), PERM_ID.toString(), USER_ID.toString()),
     ).resolves.toBeUndefined();
   });
 });
@@ -151,6 +153,7 @@ describe('PermissionService.overrideUserPermission', () => {
     (mockPermission.findById as jest.Mock).mockResolvedValue({ _id: PERM_ID } as never);
 
     const overrideDoc = { _id: new Types.ObjectId(), user: USER_ID, permission: PERM_ID, effect: 'grant' };
+    (mockOverride.findOne as jest.Mock).mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
     (mockOverride.findOneAndUpdate as jest.Mock).mockResolvedValue(overrideDoc as never);
     (mockAuditLog.create as jest.Mock).mockResolvedValue([{}]);
 
@@ -158,7 +161,7 @@ describe('PermissionService.overrideUserPermission', () => {
       USER_ID.toString(),
       PERM_ID.toString(),
       'grant',
-      'actor-id',
+      USER_ID.toString(),
     );
     expect(result.effect).toBe('grant');
     expect(mockAuditLog.create).toHaveBeenCalled();

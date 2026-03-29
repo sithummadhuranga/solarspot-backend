@@ -86,7 +86,13 @@ export const getRolePermissions = asyncHandler(async (req: AuthRequest, res: Res
  */
 export const assignPermissionToRole = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { permissionId, policyIds } = req.body;
-  const data = await PermissionService.assignPermissionToRole(String(req.params.id), permissionId, policyIds);
+  const data = await PermissionService.assignPermissionToRole(
+    String(req.params.id),
+    permissionId,
+    policyIds,
+    req.user!._id.toString(),
+    req.ip,
+  );
   return ApiResponse.created(res, data, 'Permission assigned to role');
 });
 
@@ -103,7 +109,12 @@ export const assignPermissionToRole = asyncHandler(async (req: AuthRequest, res:
  *         description: Permission removed
  */
 export const removePermissionFromRole = asyncHandler(async (req: AuthRequest, res: Response) => {
-  await PermissionService.removePermissionFromRole(String(req.params.id), String(req.params.permId));
+  await PermissionService.removePermissionFromRole(
+    String(req.params.id),
+    String(req.params.permId),
+    req.user!._id.toString(),
+    req.ip,
+  );
   return ApiResponse.noContent(res);
 });
 
@@ -149,7 +160,13 @@ export const getUserEffectivePermissions = asyncHandler(async (req: AuthRequest,
 export const overrideUserPermission = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { permissionId, effect, reason, expiresAt } = req.body;
   const data = await PermissionService.overrideUserPermission(
-    String(req.params.id), permissionId, effect, req.user!._id.toString(), reason, expiresAt,
+    String(req.params.id),
+    permissionId,
+    effect,
+    req.user!._id.toString(),
+    reason,
+    expiresAt,
+    req.ip,
   );
   return ApiResponse.created(res, data, 'Permission override saved');
 });
@@ -167,7 +184,12 @@ export const overrideUserPermission = asyncHandler(async (req: AuthRequest, res:
  *         description: Override removed
  */
 export const removeUserPermissionOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
-  await PermissionService.removeUserPermissionOverride(String(req.params.id), String(req.params.permId), req.user!._id.toString());
+  await PermissionService.removeUserPermissionOverride(
+    String(req.params.id),
+    String(req.params.permId),
+    req.user!._id.toString(),
+    req.ip,
+  );
   return ApiResponse.noContent(res);
 });
 
@@ -184,7 +206,7 @@ export const removeUserPermissionOverride = asyncHandler(async (req: AuthRequest
  */
 export const checkPermission = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { action, context } = req.body;
-  const result = await PermissionService.checkAccess(req.user!._id.toString(), action, context);
+  const result = await PermissionService.checkAccess(req.user!._id.toString(), action, context, req.ip);
   return ApiResponse.success(res, result, 'Permission evaluated');
 });
 

@@ -24,6 +24,7 @@ import { AuditLog }              from './audit_log.model';
 import { User }                  from '@modules/users/user.model';
 import { container }             from '@/container';
 import ApiError                  from '@utils/ApiError';
+import AuditService              from '@services/audit.service';
 
 class PermissionService {
   // ─── Permissions catalog ────────────────────────────────────────────────
@@ -49,7 +50,13 @@ class PermissionService {
   }
 
   /** POST /admin/roles/:id/permissions */
-  async assignPermissionToRole(roleId: string, permissionId: string, policyIds: string[] = []): Promise<IRolePermission> {
+  async assignPermissionToRole(
+    roleId: string,
+    permissionId: string,
+    policyIds: string[] = [],
+    actorId: string,
+    ip?: string,
+  ): Promise<IRolePermission> {
     const [role, permission] = await Promise.all([
       Role.findById(roleId),
       Permission.findById(permissionId),
@@ -61,14 +68,36 @@ class PermissionService {
     let result!: IRolePermission;
     await session.withTransaction(async () => {
       const existing = await RolePermission.findOne({ role: roleId, permission: permissionId }).session(session);
+      let before: Record<string, unknown> | undefined;
+      let action = 'permission.role.assigned';
+
       if (existing) {
+        before = {
+          roleId,
+          permissionId,
+          policyIds: existing.policies.map((policyId) => policyId.toString()),
+        };
         existing.set({ policies: policyIds });
         await existing.save({ session });
         result = existing as unknown as IRolePermission;
+        action = 'permission.role.updated';
       } else {
         const [doc] = await RolePermission.create([{ role: roleId, permission: permissionId, policies: policyIds }], { session });
         result = doc as unknown as IRolePermission;
       }
+
+      await AuditService.log(
+        {
+          actorId,
+          action,
+          resource: 'role_permission',
+          resourceId: result._id.toString(),
+          before,
+          after: { roleId, permissionId, policyIds },
+          ip,
+        },
+        { session },
+      );
     });
     await session.endSession();
 
@@ -77,13 +106,32 @@ class PermissionService {
   }
 
   /** DELETE /admin/roles/:id/permissions/:permId */
-  async removePermissionFromRole(roleId: string, permissionId: string): Promise<void> {
+  async removePermissionFromRole(roleId: string, permissionId: string, actorId: string, ip?: string): Promise<void> {
     const rp = await RolePermission.findOne({ role: roleId, permission: permissionId });
     if (!rp) throw ApiError.notFound('Role-permission assignment not found');
 
     const session = await mongoose.startSession();
     await session.withTransaction(async () => {
       await RolePermission.deleteOne({ _id: rp._id }).session(session);
+      await AuditService.log(
+        {
+          actorId,
+          action: 'permission.role.removed',
+          resource: 'role_permission',
+          resourceId: rp._id?.toString(),
+          before: {
+            roleId,
+            permissionId,
+            policyIds: Array.isArray(rp.policies)
+              ? rp.policies
+                  .map((policyId) => policyId?.toString())
+                  .filter((policyId): policyId is string => Boolean(policyId))
+              : [],
+          },
+          ip,
+        },
+        { session },
+      );
     });
     await session.endSession();
 
@@ -127,6 +175,7 @@ class PermissionService {
     grantedById: string,
     reason?: string,
     expiresAt?: Date,
+    ip?: string,
   ): Promise<IUserPermissionOverride> {
     const [targetUser, permission] = await Promise.all([
       User.findById(userId),
@@ -138,6 +187,8 @@ class PermissionService {
     const session = await mongoose.startSession();
     let override!: IUserPermissionOverride;
     await session.withTransaction(async () => {
+      const previous = await UserPermissionOverride.findOne({ user: userId, permission: permissionId }).session(session);
+
       const doc = await UserPermissionOverride.findOneAndUpdate(
         { user: userId, permission: permissionId },
         { $set: { effect, reason, grantedBy: grantedById, expiresAt: expiresAt ?? null } },
@@ -145,14 +196,26 @@ class PermissionService {
       );
       override = doc as unknown as IUserPermissionOverride;
 
-      await AuditLog.create([{
-        actor:      grantedById,
-        action:     `permission.override.${effect}`,
-        resource:   'user_permission_override',
-        resourceId: override._id,
-        after:      { userId, permissionId, effect, reason, expiresAt },
-        ip:         undefined,
-      }], { session });
+      await AuditService.log(
+        {
+          actorId: grantedById,
+          action: previous ? 'permission.override.updated' : 'permission.override.created',
+          resource: 'user_permission_override',
+          resourceId: override._id.toString(),
+          before: previous
+            ? {
+                userId,
+                permissionId,
+                effect: previous.effect,
+                reason: previous.reason,
+                expiresAt: previous.expiresAt,
+              }
+            : undefined,
+          after: { userId, permissionId, effect, reason, expiresAt },
+          ip,
+        },
+        { session },
+      );
     });
     await session.endSession();
 
@@ -161,20 +224,30 @@ class PermissionService {
   }
 
   /** DELETE /admin/users/:id/permissions/:permId */
-  async removeUserPermissionOverride(userId: string, permissionId: string, actorId: string): Promise<void> {
+  async removeUserPermissionOverride(userId: string, permissionId: string, actorId: string, ip?: string): Promise<void> {
     const override = await UserPermissionOverride.findOne({ user: userId, permission: permissionId });
     if (!override) throw ApiError.notFound('Permission override not found');
 
     const session = await mongoose.startSession();
     await session.withTransaction(async () => {
       await UserPermissionOverride.deleteOne({ _id: override._id }).session(session);
-      await AuditLog.create([{
-        actor:      actorId,
-        action:     'permission.override.removed',
-        resource:   'user_permission_override',
-        resourceId: override._id,
-        before:     { userId, permissionId, effect: override.effect },
-      }], { session });
+      await AuditService.log(
+        {
+          actorId,
+          action: 'permission.override.removed',
+          resource: 'user_permission_override',
+          resourceId: override._id.toString(),
+          before: {
+            userId,
+            permissionId,
+            effect: override.effect,
+            reason: override.reason,
+            expiresAt: override.expiresAt,
+          },
+          ip,
+        },
+        { session },
+      );
     });
     await session.endSession();
 
@@ -184,7 +257,12 @@ class PermissionService {
   // ─── Permission check ─────────────────────────────────────────────────────
 
   /** POST /permissions/check */
-  async checkAccess(userId: string, action: string, context: Record<string, unknown> = {}): Promise<EvaluationResult> {
+  async checkAccess(
+    userId: string,
+    action: string,
+    context: Record<string, unknown> = {},
+    ip?: string,
+  ): Promise<EvaluationResult> {
     const user = await User.findById(userId).populate<{ role: IRole }>('role').lean();
     if (!user) throw ApiError.notFound('User not found');
 
@@ -197,10 +275,26 @@ class PermissionService {
       isBanned:       user.isBanned,
     };
 
-    // context is passed by callers but the engine's resource param is a Document;
-    // for programmatic checks (no loaded resource), we pass undefined.
-    void context;
-    return container.permissionEngine.evaluate(userForPerm, action as import('@/types').PermissionAction);
+    const result = await container.permissionEngine.evaluate(
+      userForPerm,
+      action as import('@/types').PermissionAction,
+    );
+
+    await AuditService.log({
+      actorId: userId,
+      action: 'permission.check',
+      resource: 'permission',
+      after: {
+        requestedAction: action,
+        allowed: result.allowed,
+        reason: result.reason,
+        policy: result.policy,
+        context,
+      },
+      ip,
+    });
+
+    return result;
   }
 
   // ─── Audit logs ──────────────────────────────────────────────────────────
