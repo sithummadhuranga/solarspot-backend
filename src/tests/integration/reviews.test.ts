@@ -10,19 +10,9 @@
  * Business-logic auth (ownership, self-vote, self-flag) lives in the SERVICE
  * layer and is fully exercised by these tests.
  *
- * Perspective API: axios is mocked to fail immediately so checkToxicity()
- * degrades gracefully (returns null → review approved by default).
- * This keeps tests deterministic and avoids 5-second network timeouts.
+ * Toxicity detection: uses the built-in local regex scorer (zero-cost, no network).
+ * Clean test content scores 0 → approved by default in all create-review tests.
  */
-
-// Prevent actual HTTP calls to Perspective API — checkToxicity handles failure gracefully
-jest.mock('axios', () => ({
-  __esModule: true,
-  default: {
-    post: jest.fn().mockRejectedValue(new Error('axios mock — no network in integration tests')),
-    get:  jest.fn().mockRejectedValue(new Error('axios mock — no network in integration tests')),
-  },
-}));
 
 import request from 'supertest';
 import mongoose, { Types } from 'mongoose';

@@ -3,16 +3,30 @@
  * Owner: Member 2
  *
  * Pattern mirrors station.service.test.ts — mocked models, no real DB.
+ *
+ * Toxicity scoring coverage:
+ *   - HuggingFace AI path: global.fetch is mocked, config.HUGGINGFACE_API_KEY is set per-test
+ *   - Local fallback: HUGGINGFACE_API_KEY absent (default test env), deterministic regex
  */
 
 import { Types } from 'mongoose';
-import axios from 'axios';
 import * as reviewService from '@modules/reviews/review.service';
 import { Review } from '@modules/reviews/review.model';
 import { Station } from '@modules/stations/station.model';
+import { config } from '@config/env';
 import { container } from '@/container';
 
 /* ── Mocks ──────────────────────────────────────────────────────────────────── */
+
+
+jest.mock('@/container', () => ({
+  container: {
+    quotaService: {
+      check:     jest.fn().mockResolvedValue(true),
+      increment: jest.fn().mockResolvedValue(undefined),
+    },
+  },
+}));
 
 jest.mock('@modules/users/user.model', () => ({}));
 
@@ -43,32 +57,6 @@ jest.mock('@utils/logger', () => ({
     error: jest.fn(),
     debug: jest.fn(),
     http:  jest.fn(),
-  },
-}));
-
-// Perspective API quota is always exhausted in unit tests — no real HTTP calls made
-jest.mock('@/container', () => ({
-  container: {
-    quotaService: {
-      check:     jest.fn().mockResolvedValue(false),
-      increment: jest.fn().mockResolvedValue(undefined),
-    },
-  },
-}));
-
-// Axios is explicitly mocked so tests can assert call arguments when quota allows it
-jest.mock('axios', () => ({
-  __esModule: true,
-  default: {
-    post: jest.fn(),
-    get:  jest.fn(),
-  },
-}));
-
-jest.mock('@config/env', () => ({
-  config: {
-    PERSPECTIVE_API_KEY: 'test-key',
-    NODE_ENV: 'test',
   },
 }));
 
@@ -662,141 +650,264 @@ describe('moderateReview', () => {
   });
 });
 
-/* ── createReview — Perspective API toxicity scoring branches ────────────────── */
+/* ── createReview — HuggingFace AI moderation path ──────────────────────────── */
 
 /**
- * These tests unlock the checkToxicity() code path by overriding the quota mock
- * to return `true` for one call, then providing controlled axios responses.
- * This covers lines that are otherwise unreachable in unit tests (quota always
- * returns false in the module-level mock).
- *
- * Mapping to coverage gaps:
- *  - score >= 0.80  → moderationStatus 'rejected'  (auto-reject branch)
- *  - score 0.60–0.79 → moderationStatus 'pending'   (human-review branch)
- *  - score < 0.60   → moderationStatus 'approved'   (auto-approve branch)
- *  - non-numeric    → toxicityScore omitted, approved by default
- *  - axios throws   → catch branch, approved by default
+ * These tests exercise the HuggingFace toxic-bert path inside checkToxicity.
+ * global.fetch is mocked per-test. Each test temporarily sets
+ * config.HUGGINGFACE_API_KEY to a non-empty value so the service takes the AI path.
+ * The quota service mock always returns canCall=true by default.
  */
-describe('createReview — Perspective API toxicity scoring', () => {
-  const toxicityInput = {
+describe('createReview — HuggingFace AI moderation', () => {
+  const hfInput = {
     station: STATION_ID,
     rating:  3,
-    title:   'Toxicity test review',
-    content: 'Really enjoyed charging here. Fast and reliable.',
+    title:   'Test review',
+    content: 'This is some review content for HuggingFace to evaluate.',
   };
 
-  /** Re-usable helper: sets up the station and duplicate-check mocks per test */
   function setupCreateMocks(): void {
     (Station.findOne as jest.Mock).mockResolvedValue(makeMockStation());
     (Review.findOne  as jest.Mock).mockResolvedValue(null);
   }
 
-  it('auto-rejects review with moderationStatus "rejected" when Perspective score >= 0.80', async () => {
-    // Allow quota for ONE call, then fall back to the module-level mock (false)
-    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
-    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
-    (axios.post as jest.Mock).mockResolvedValueOnce({
-      data: { attributeScores: { TOXICITY: { summaryScore: { value: 0.85 } } } },
+  /**
+   * Builds a fetch mock that returns the HuggingFace toxic-bert response shape:
+   * [[{ label: 'toxic', score }, { label: 'non-toxic', score: 1-score }]]
+   */
+  function mockHFResponse(score: number): void {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok:   true,
+      json: async () => [[{ label: 'toxic', score }, { label: 'non-toxic', score: 1 - score }]],
+      text: async () => '',
     });
+  }
+
+  function getCreateArg(): Record<string, unknown> {
+    return (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+  }
+
+  beforeEach(() => {
+    // Enable HuggingFace path for every test in this describe block
+    config.HUGGINGFACE_API_KEY = 'test-hf-key';
+  });
+
+  afterEach(() => {
+    // Reset so tests outside this block stay on the local scorer path
+    config.HUGGINGFACE_API_KEY = '';
+  });
+
+  it('calls HuggingFace API and auto-rejects when toxic score >= 0.80', async () => {
+    setupCreateMocks();
+    mockHFResponse(0.92);
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'rejected' }));
+
+    await reviewService.createReview(AUTHOR_ID, hfInput);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('router.huggingface.co'),
+      expect.any(Object),
+    );
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('rejected');
+    expect(arg.toxicityScore).toBe(0.92);
+  });
+
+  it('holds review as pending when HuggingFace score is 0.60–0.79', async () => {
+    setupCreateMocks();
+    mockHFResponse(0.68);
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'pending' }));
+
+    await reviewService.createReview(AUTHOR_ID, hfInput);
+
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('pending');
+    expect(arg.toxicityScore).toBe(0.68);
+  });
+
+  it('auto-approves when HuggingFace score is below 0.60', async () => {
+    setupCreateMocks();
+    mockHFResponse(0.05);
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    await reviewService.createReview(AUTHOR_ID, hfInput);
+
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('approved');
+    expect(arg.toxicityScore).toBe(0.05);
+  });
+
+  it('increments HuggingFace quota after a successful API call', async () => {
+    setupCreateMocks();
+    mockHFResponse(0.1);
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview());
+
+    await reviewService.createReview(AUTHOR_ID, hfInput);
+
+    expect(container.quotaService.increment).toHaveBeenCalledWith('huggingface');
+  });
+
+  it('falls back to local scorer when HuggingFace fetch throws a network error', async () => {
+    setupCreateMocks();
+    global.fetch = jest.fn().mockRejectedValue(new Error('ETIMEDOUT'));
+    // Clean content → local scorer returns 0 → approved
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    await reviewService.createReview(AUTHOR_ID, {
+      ...hfInput,
+      content: 'Great station, very fast charging.',
+    });
+
+    const arg = getCreateArg();
+    // Local scorer ran (not HuggingFace), score=0, status=approved
+    expect(arg.moderationStatus).toBe('approved');
+    expect(arg.toxicityScore).toBe(0);
+  });
+
+  it('falls back to local scorer when HuggingFace quota is exhausted', async () => {
+    setupCreateMocks();
+    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(false);
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    await reviewService.createReview(AUTHOR_ID, {
+      ...hfInput,
+      content: 'Reliable and well maintained station.',
+    });
+
+    // HuggingFace was skipped — fetch should not have been called
+    expect(global.fetch).not.toHaveBeenCalled();
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('approved');
+  });
+});
+
+/* ── createReview — local toxicity scoring branches ─────────────────────────── */
+
+/**
+ * These tests exercise the local regex-based fallback scorer.
+ * HUGGINGFACE_API_KEY is '' (not set) in the standard test environment,
+ * so checkToxicity always takes the local path — no mocks needed.
+ *
+ * Score tiers (additive, capped at 1.0):
+ *   Tier 1 — explicit threats      → +0.80
+ *   Tier 2 — severe slurs/KYS      → +0.50
+ *   Tier 3 — moderate profanity    → +0.25
+ *   Tier 4 — structural signals    → up to +0.15
+ *
+ * Threshold mapping:
+ *   score >= 0.80  → moderationStatus 'rejected'
+ *   score 0.60–0.79 → moderationStatus 'pending'
+ *   score < 0.60   → moderationStatus 'approved'
+ */
+describe('createReview — local toxicity scoring', () => {
+  function setupCreateMocks(): void {
+    (Station.findOne as jest.Mock).mockResolvedValue(makeMockStation());
+    (Review.findOne  as jest.Mock).mockResolvedValue(null);
+  }
+
+  function getCreateArg(): Record<string, unknown> {
+    return (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+  }
+
+  it('auto-rejects review containing explicit threat content (tier 1, score=0.80)', async () => {
     setupCreateMocks();
     (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'rejected' }));
 
-    await reviewService.createReview(AUTHOR_ID, toxicityInput);
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  1,
+      title:   'Threat review',
+      content: 'I will kill you',   // matches tier-1 threat pattern → +0.80
+    });
 
-    // Inspect what was actually passed to Review.create, not the resolved mock value
-    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
-    expect(createArg.moderationStatus).toBe('rejected');
-    expect(createArg.toxicityScore).toBe(0.85);
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('rejected');
+    expect(arg.toxicityScore).toBe(0.8);
   });
 
-  it('holds review as "pending" when Perspective score is >= 0.60 and < 0.80', async () => {
-    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
-    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
-    (axios.post as jest.Mock).mockResolvedValueOnce({
-      data: { attributeScores: { TOXICITY: { summaryScore: { value: 0.70 } } } },
-    });
+  it('holds review as "pending" when content scores 0.60–0.79 (tier 2 + tier 3 = 0.75)', async () => {
     setupCreateMocks();
     (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'pending' }));
 
-    await reviewService.createReview(AUTHOR_ID, toxicityInput);
-
-    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
-    expect(createArg.moderationStatus).toBe('pending');
-    expect(createArg.toxicityScore).toBe(0.70);
-  });
-
-  it('auto-approves review when Perspective score < 0.60', async () => {
-    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
-    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
-    (axios.post as jest.Mock).mockResolvedValueOnce({
-      data: { attributeScores: { TOXICITY: { summaryScore: { value: 0.25 } } } },
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  1,
+      title:   'Borderline review',
+      // tier2: "go kill yourself" (+0.50)  tier3: "you idiot" (+0.25)  = 0.75
+      content: 'Go kill yourself you idiot',
     });
+
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('pending');
+    expect(arg.toxicityScore).toBe(0.75);
+  });
+
+  it('auto-approves clean review (score=0)', async () => {
     setupCreateMocks();
     (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
 
-    await reviewService.createReview(AUTHOR_ID, toxicityInput);
-
-    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
-    expect(createArg.moderationStatus).toBe('approved');
-    expect(createArg.toxicityScore).toBe(0.25);
-  });
-
-  it('omits toxicityScore and defaults to "approved" when API response has non-numeric value', async () => {
-    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
-    (container.quotaService.increment as jest.Mock).mockResolvedValueOnce(undefined);
-    // Perspective occasionally returns null or string when the model is unavailable
-    (axios.post as jest.Mock).mockResolvedValueOnce({
-      data: { attributeScores: { TOXICITY: { summaryScore: { value: null } } } },
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  5,
+      title:   'Great station',
+      content: 'Really enjoyed charging here. Fast and reliable.',  // no tier hits → 0
     });
-    setupCreateMocks();
-    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
 
-    await reviewService.createReview(AUTHOR_ID, toxicityInput);
-
-    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
-    expect(createArg.moderationStatus).toBe('approved');
-    // checkToxicity() returns null → the spread omits toxicityScore
-    expect(createArg.toxicityScore).toBeUndefined();
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('approved');
+    expect(arg.toxicityScore).toBe(0);
   });
 
-  it('degrades gracefully and defaults to "approved" when Perspective API HTTP call fails', async () => {
-    // Quota allows the call, but the network fails — checkToxicity enters the catch branch
-    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
-    (axios.post as jest.Mock).mockRejectedValueOnce(new Error('Simulated network timeout'));
+  it('includes toxicityScore=0 in create args — not omitted when score is zero', async () => {
+    // The spread `...(toxicityScore !== null && { toxicityScore })` evaluates `0 !== null`
+    // as true, so toxicityScore=0 must be present (not undefined).
     setupCreateMocks();
-    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview());
 
-    // createReview must NOT throw — Perspective failure is a soft degradation
-    await expect(
-      reviewService.createReview(AUTHOR_ID, toxicityInput),
-    ).resolves.toBeDefined();
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  4,
+      title:   'Normal review',
+      content: 'Good experience overall, well maintained station.',
+    });
 
-    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
-    // catch block returns null → no toxicityScore field included, moderationStatus defaults to approved
-    expect(createArg.moderationStatus).toBe('approved');
-    expect(createArg.toxicityScore).toBeUndefined();
+    const arg = getCreateArg();
+    expect(arg.toxicityScore).toBe(0);
+    expect(arg.toxicityScore).not.toBeUndefined();
   });
 
-  it('skips toxicity check and approves by default when PERSPECTIVE_API_KEY is not configured', async () => {
-    // Temporarily remove the key to exercise the early-return branch in checkToxicity
-    const configMod = jest.requireMock('@config/env') as { config: { PERSPECTIVE_API_KEY: string; NODE_ENV: string } };
-    const savedKey = configMod.config.PERSPECTIVE_API_KEY;
-    configMod.config.PERSPECTIVE_API_KEY = '';
-
-    (container.quotaService.check as jest.Mock).mockResolvedValueOnce(true);
+  it('approves mild profanity alone — tier 3 only (score=0.25 < 0.60)', async () => {
     setupCreateMocks();
     (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
 
-    try {
-      await reviewService.createReview(AUTHOR_ID, toxicityInput);
-    } finally {
-      // Always restore key so this test does not bleed into subsequent tests
-      configMod.config.PERSPECTIVE_API_KEY = savedKey;
-    }
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  2,
+      title:   'Mild language review',
+      content: 'Fuck off this is a terrible station.',  // tier3 profanity only → 0.25
+    });
 
-    const createArg = (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
-    expect(createArg.moderationStatus).toBe('approved');
-    // axios.post must never be called when the key is missing
-    expect(axios.post).not.toHaveBeenCalled();
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('approved');
+    expect(arg.toxicityScore).toBe(0.25);
+  });
+
+  it('approves all-caps structural signals alone — tier 4 (score < 0.60)', async () => {
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    // All-caps ratio > 0.6 with length > 20 → +0.10; aggressive punct (≥2 runs of 3+) → +0.05
+    const shouted = 'THIS STATION WAS TERRIBLE AND I HATED IT!!!! WORST EXPERIENCE EVER!!!!!';
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  1,
+      title:   'Shouted review',
+      content: shouted,
+    });
+
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('approved');
+    expect(arg.toxicityScore as number).toBeGreaterThan(0);
+    expect(arg.toxicityScore as number).toBeLessThan(0.60);
   });
 });
