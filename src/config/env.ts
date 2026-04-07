@@ -41,7 +41,13 @@ export const config = {
   // ── Third-party APIs ─────────────────────────────────────
   // Accepts both OPENWEATHERMAP_API_KEY (.env default) and OPENWEATHER_API_KEY
   OPENWEATHER_API_KEY: process.env.OPENWEATHER_API_KEY ?? process.env.OPENWEATHERMAP_API_KEY ?? '',  // REQUIRED for weather
-  PERSPECTIVE_API_KEY: process.env.PERSPECTIVE_API_KEY as string,  // REQUIRED for moderation
+  PERSPECTIVE_API_KEY: process.env.PERSPECTIVE_API_KEY as string,  // Legacy — kept for backward compat
+
+  // HuggingFace Inference API — primary AI toxicity screener for reviews.
+  // Uses unitary/toxic-bert: BERT classifier trained on millions of toxic comments.
+  // Free tier: ~1,000 req/day. Get a token at: https://huggingface.co/settings/tokens
+  // If absent or quota reached, falls back to local regex scorer.
+  HUGGINGFACE_API_KEY: process.env.HUGGINGFACE_API_KEY ?? '',
 
   // ── Cloudinary (image CDN) ────────────────────────────────
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME as string,
