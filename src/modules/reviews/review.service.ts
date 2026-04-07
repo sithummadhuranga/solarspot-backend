@@ -7,7 +7,6 @@
  *      MASTER_PROMPT.md → SOLID — SRP: only business logic here, no HTTP concerns
  */
 
-import axios from 'axios';
 import { Types } from 'mongoose';
 import { Review } from './review.model';
 import { Station } from '@modules/stations/station.model';
@@ -19,8 +18,8 @@ import type {
   ModerateReviewInput,
   ListReviewsQuery,
 } from '@/types';
-import { container } from '@/container';
 import { config } from '@config/env';
+import { container } from '@/container';
 import ApiError from '@utils/ApiError';
 import logger from '@utils/logger';
 
@@ -56,46 +55,173 @@ function buildSort(sort: string): Record<string, 1 | -1> {
   }
 }
 
+const HF_MODERATION_URL = 'https://router.huggingface.co/hf-inference/models/unitary/toxic-bert';
+
 /**
- * Checks the toxicity of review content via the Perspective API.
+ * Calls the HuggingFace Inference API (unitary/toxic-bert) and returns a
+ * normalised toxicity score (0–1). toxic-bert is a BERT-based classifier
+ * trained on millions of labelled toxic comments — it returns a direct
+ * probability rather than requiring a structured prompt.
  *
- * Returns a 0–1 score, or null when the quota is exhausted or the API is
- * unavailable. Callers must handle null gracefully (i.e. approve by default).
- * This is the correct degradation behaviour per PROJECT_OVERVIEW.md:
- *   "Skip check, flag for manual review"
+ * Throws on network error, timeout, model-loading state, or malformed
+ * response so the caller can fall back to the local scorer.
+ */
+async function callHuggingFaceModerator(content: string): Promise<number> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+
+  let responseData: unknown;
+  try {
+    const res = await fetch(HF_MODERATION_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.HUGGINGFACE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ inputs: content }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`HuggingFace API returned HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+    }
+    responseData = await res.json();
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+
+  // Model in cold-start / loading state — treat as unavailable, let caller fall back
+  if (typeof responseData === 'object' && responseData !== null && 'error' in responseData) {
+    const errObj = responseData as { error: string; estimated_time?: number };
+    throw new Error(
+      `HuggingFace model not ready: ${errObj.error} (est. ${errObj.estimated_time ?? '?'}s)`,
+    );
+  }
+
+  // Expected shape: [[{ label: 'toxic', score: 0.02 }, { label: 'non-toxic', score: 0.98 }]]
+  const results = responseData as Array<Array<{ label: string; score: number }>>;
+  const inner = results?.[0];
+  if (!Array.isArray(inner)) {
+    throw new Error(
+      `HuggingFace returned unexpected shape: ${JSON.stringify(responseData).slice(0, 200)}`,
+    );
+  }
+
+  const toxicEntry = inner.find(r => r.label.toLowerCase() === 'toxic');
+  if (!toxicEntry) {
+    throw new Error(`HuggingFace response missing 'toxic' label: ${JSON.stringify(inner)}`);
+  }
+
+  const score = toxicEntry.score;
+  if (Number.isNaN(score) || score < 0 || score > 1) {
+    throw new Error(`HuggingFace returned invalid score: ${score}`);
+  }
+
+  logger.info(`[reviews] HuggingFace toxic-bert score=${score.toFixed(3)}`);
+  return score;
+}
+
+/**
+ * Local regex-based fallback scorer — zero cost, zero network dependency.
+ *
+ * Scoring is additive (capped at 1.0):
+ *   Tier 1 — explicit threats               → +0.80
+ *   Tier 2 — severe slurs / KYS             → +0.50
+ *   Tier 3 — moderate profanity / attacks   → +0.25
+ *   Tier 4 — structural signals (caps/!!!!) → up to +0.15
+ */
+function localToxicityScore(content: string): number {
+  let score = 0;
+  const text = content.toLowerCase();
+
+  const THREAT_PATTERNS: RegExp[] = [
+    // Direct violence verb targeting a person (you, him, her, them, the owner, etc.)
+    /\b(kill|murder|shoot|stab|rape|strangle)\s+(you|him|her|them|u)\b/i,
+    /\b(kill|murder|shoot|stab|strangle)\s+the\s+\w+/i,
+    // "I will/am going to kill/hurt [anyone]" — no restriction on the target word
+    /\bi\s+(will|am going to|gonna|shall)\s+(kill|hurt|destroy|harm|attack)\b/i,
+    /\byou('re| are| will be)\s+(going to\s+)?(die|dead|finished)\b/i,
+    /\bi\s+know\s+where\s+you\s+live\b/i,
+    /\b(death|bomb|shooting)\s+threat\b/i,
+  ];
+  if (THREAT_PATTERNS.some((p) => p.test(content))) score += 0.80;
+
+  // Patterns use character-class variants to avoid embedding explicit slurs in source.
+  const SEVERE_PATTERNS: RegExp[] = [
+    /\bn[i!1][g9][g9][ae3]r+\b/i,
+    /\bf[a@4][g9][g9][o0]+t+\b/i,
+    /\bc[u*][n][t]+\b/i,
+    /\b(go\s+kill\s+yourself|kys)\b/i,
+    /\b(subhuman|vermin|parasite)\s+(race|people|community)\b/i,
+  ];
+  if (SEVERE_PATTERNS.some((p) => p.test(content))) score += 0.50;
+
+  const MEDIUM_PATTERNS: RegExp[] = [
+    // f-word in any form (fuck, fucking, fucked, fucker, wtf, etc.)
+    /\bf[u*][c@][k](ing|ed|er|s|head|wit|face|wad)?\b/i,
+    /\bwhat\s+the\s+f[u*][c@][k]\b/i,
+    /\bwt[f]\b/i,
+    // sh*t in any form
+    /\bs[h]?[i!1][t]+\b/i,
+    // a**hole / a**
+    /\ba[s$][s$]\s*(hole|hat|wipe|clown|face)?\b/i,
+    /\b(b[i!1]tch|bastard|prick|dick|cock|twat|wanker|tosser|douchebag)\b/i,
+    /\b(go\s+to\s+hell|shut\s+up|get\s+lost)\b/i,
+    /\b(you\s+(are\s+a?\s*)?(stupid|dumb|idiot|moron|retard|useless|worthless|incompetent))\b/i,
+    /\b(trash|garbage|scum)\s+(station|place|location)\b/i,
+    /\b(terrible|horrible|disgusting|despicable|pathetic)\s+(owner|staff|person|human)\b/i,
+  ];
+  if (MEDIUM_PATTERNS.some((p) => p.test(text))) score += 0.25;
+
+  const allCapsRatio = (content.match(/[A-Z]/g) ?? []).length / Math.max(content.length, 1);
+  if (allCapsRatio > 0.6 && content.length > 20) score += 0.10;
+
+  const aggressivePunctuation = (content.match(/[!?]{3,}/g) ?? []).length;
+  if (aggressivePunctuation >= 2) score += 0.05;
+
+  return Math.min(Math.round(score * 100) / 100, 1.0);
+}
+
+/**
+ * Screens review content for toxicity using a two-tier cascade:
+ *
+ * 1. HuggingFace toxic-bert (primary AI — requires HUGGINGFACE_API_KEY):
+ *    BERT classifier trained on millions of toxic comments; returns a direct
+ *    probability with no prompt engineering. Free tier: ~1,000 req/day.
+ *
+ * 2. Local regex scorer (fallback — always available, zero cost):
+ *    Deterministic keyword/pattern matching. Used when HuggingFace is
+ *    absent, quota-exhausted, or unreachable.
+ *
+ * Returns null only when BOTH paths fail unexpectedly, triggering graceful
+ * degradation: review is approved and the community 3-flag system handles it.
  */
 async function checkToxicity(content: string): Promise<number | null> {
-  // Gate every external call behind the quota check (MASTER_PROMPT security rule)
-  const canCall = await container.quotaService.check('perspective');
-  if (!canCall) {
-    logger.warn('[reviews] Perspective API quota exhausted — skipping toxicity check, flagging for manual review');
-    return null;
+  // Primary: HuggingFace toxic-bert
+  if (config.HUGGINGFACE_API_KEY) {
+    try {
+      const quotaOk = await container.quotaService.check('huggingface');
+      if (!quotaOk) {
+        logger.warn('[reviews] HuggingFace daily quota reached — falling back to local scorer');
+      } else {
+        const score = await callHuggingFaceModerator(content);
+        await container.quotaService.increment('huggingface');
+        return score;
+      }
+    } catch (err) {
+      logger.warn(
+        `[reviews] HuggingFace moderation unavailable — falling back to local scorer: ${(err as Error).message}`,
+      );
+    }
   }
 
-  if (!config.PERSPECTIVE_API_KEY) {
-    // Key not configured — log once and skip silently in development
-    logger.warn('[reviews] PERSPECTIVE_API_KEY is not set — skipping toxicity check');
-    return null;
-  }
-
+  // Fallback: local regex scorer — always available, deterministic, zero-cost
   try {
-    const response = await axios.post(
-      `https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze?key=${config.PERSPECTIVE_API_KEY}`,
-      {
-        comment: { text: content },
-        languages: ['en'],
-        requestedAttributes: { TOXICITY: {} },
-      },
-      { timeout: 5_000 },
-    );
-
-    await container.quotaService.increment('perspective');
-
-    const score: unknown = response.data?.attributeScores?.TOXICITY?.summaryScore?.value;
-    return typeof score === 'number' ? Math.round(score * 100) / 100 : null;
+    return localToxicityScore(content);
   } catch (err) {
-    // Never block user actions on third-party API failures — degrade gracefully
-    logger.warn(`[reviews] Perspective API call failed — defaulting to manual review: ${err}`);
+    logger.warn(`[reviews] Local scorer failed unexpectedly: ${err}`);
     return null;
   }
 }
@@ -181,9 +307,11 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
   }
 
   // One review per station per user — enforce at application level too
+  // Only check active (non-deleted) reviews so deleted reviews don't block re-submission
   const existing = await Review.findOne({
-    station: new Types.ObjectId(stationId),
-    author:  new Types.ObjectId(authorId),
+    station:  new Types.ObjectId(stationId),
+    author:   new Types.ObjectId(authorId),
+    isActive: true,
   });
   if (existing) {
     throw ApiError.conflict('You have already reviewed this station');
@@ -214,7 +342,9 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
     content,
     moderationStatus,
     ...(toxicityScore !== null && { toxicityScore }),
-    isActive: true,
+    // If the review is auto-rejected by moderation, keep it stored but mark
+    // it inactive so it doesn't block re-submission by the same author.
+    isActive: moderationStatus !== 'rejected',
   });
 
   logger.info(`[reviews] Created review ${review._id} for station ${stationId} by user ${authorId} (toxicity: ${toxicityScore ?? 'skipped'}, status: ${moderationStatus})`);
@@ -228,15 +358,33 @@ export async function updateReview(id: string, authorId: string, input: UpdateRe
   const review = await Review.findOne({ _id: id, isActive: true });
   if (!review) throw ApiError.notFound('Review not found');
 
-  // Only the author can update their own review
   if (review.author.toString() !== authorId) {
     throw ApiError.forbidden('You can only edit your own reviews');
   }
 
-  // Apply permitted field updates
   if (input.rating !== undefined) review.rating = input.rating;
   if (input.title !== undefined) review.title = input.title;
-  if (input.content !== undefined) review.content = input.content;
+
+  // Re-screen content for toxicity whenever the text changes.
+  // An edited review may contain new harmful content not present in the original.
+  if (input.content !== undefined) {
+    review.content = input.content;
+
+    const toxicityScore = await checkToxicity(input.content);
+    if (toxicityScore !== null) {
+      if (toxicityScore >= TOXICITY_AUTO_REJECT) {
+        review.moderationStatus = 'rejected';
+        review.isActive = false;
+      } else if (toxicityScore >= TOXICITY_PENDING_THRESHOLD) {
+        review.moderationStatus = 'pending';
+      } else {
+        // Clean update — restore to approved so it's visible again
+        if (review.moderationStatus === 'pending') {
+          review.moderationStatus = 'approved';
+        }
+      }
+    }
+  }
 
   await review.save();
   logger.info(`[reviews] Updated review ${id} by user ${authorId}`);
@@ -382,11 +530,15 @@ export async function moderateReview(id: string, moderatorId: string, input: Mod
   review.moderatedAt = new Date();
   review.moderationNote = input.moderationNote ?? undefined;
 
-  // If approved, clear flag state
   if (input.moderationStatus === 'approved') {
+    // Clear flag state so the review surfaces cleanly
     review.isFlagged = false;
     review.flaggedBy = [];
     review.flagCount = 0;
+  } else if (input.moderationStatus === 'rejected') {
+    // Mark inactive so the author can re-submit a corrected review.
+    // Mirrors the auto-reject path in createReview (isActive: moderationStatus !== 'rejected').
+    review.isActive = false;
   }
 
   await review.save();
