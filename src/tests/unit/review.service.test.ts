@@ -924,3 +924,129 @@ describe('createReview — local toxicity scoring', () => {
     expect(arg.toxicityScore as number).toBeLessThan(0.60);
   });
 });
+
+/* ── createReview — title moderation coverage ───────────────────────────────── */
+
+/**
+ * These tests verify that the review TITLE is included in the toxicity screening.
+ * Previously only the body content was screened; a user could submit a clean body
+ * with a toxic title and it would pass moderation.
+ *
+ * The fix combines title + content into a single string before calling
+ * checkToxicity(), so either field alone can trigger rejection or pending.
+ *
+ * All tests in this block run with HUGGINGFACE_API_KEY='' so the local regex
+ * scorer is used — no fetch mocking required.
+ */
+describe('createReview — title moderation', () => {
+  function setupCreateMocks(): void {
+    (Station.findOne as jest.Mock).mockResolvedValue(makeMockStation());
+    (Review.findOne  as jest.Mock).mockResolvedValue(null);
+  }
+
+  function getCreateArg(): Record<string, unknown> {
+    return (Review.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+  }
+
+  it('auto-rejects when title contains an explicit threat but body is clean', async () => {
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'rejected' }));
+
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  1,
+      title:   'I will kill you',   // tier-1 threat in title (+0.80)
+      content: 'The charging was decent enough.',  // clean body
+    });
+
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('rejected');
+    expect(arg.toxicityScore).toBe(0.8);
+  });
+
+  it('marks pending when title has severe language but body is clean', async () => {
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'pending' }));
+
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  1,
+      // tier-2 (go kill yourself +0.50) + tier-3 (you idiot +0.25) = 0.75 in title
+      title:   'Go kill yourself you idiot',
+      content: 'The station itself was fine.',  // clean body
+    });
+
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('pending');
+    expect(arg.toxicityScore).toBe(0.75);
+  });
+
+  it('still approves a review whose combined title+content is clean', async () => {
+    setupCreateMocks();
+    (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
+
+    await reviewService.createReview(AUTHOR_ID, {
+      station: STATION_ID,
+      rating:  5,
+      title:   'Excellent fast charger',
+      content: 'Battery topped up in 30 minutes. Highly recommended.',
+    });
+
+    const arg = getCreateArg();
+    expect(arg.moderationStatus).toBe('approved');
+    expect(arg.toxicityScore).toBe(0);
+  });
+});
+
+/* ── updateReview — title moderation coverage ───────────────────────────────── */
+
+/**
+ * These tests verify that editing a review's TITLE re-triggers toxicity
+ * screening even when the body content is unchanged.
+ * Previously only a content change would trigger re-screening.
+ */
+describe('updateReview — title moderation', () => {
+  it('rejects the update when the new title contains an explicit threat', async () => {
+    const reviewDoc = makeMockReview({ author: new Types.ObjectId(AUTHOR_ID) });
+    (Review.findOne as jest.Mock).mockResolvedValue(reviewDoc);
+
+    await reviewService.updateReview(REVIEW_ID, AUTHOR_ID, {
+      title: 'I will kill you',  // tier-1 threat → score 0.80 → rejected
+    });
+
+    expect(reviewDoc.moderationStatus).toBe('rejected');
+    expect(reviewDoc.isActive).toBe(false);
+    expect(reviewDoc.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks pending when new title has severe language (no content change)', async () => {
+    const reviewDoc = makeMockReview({ author: new Types.ObjectId(AUTHOR_ID) });
+    (Review.findOne as jest.Mock).mockResolvedValue(reviewDoc);
+
+    await reviewService.updateReview(REVIEW_ID, AUTHOR_ID, {
+      // Go kill yourself (+0.50) + you idiot (+0.25) = 0.75 → pending
+      title: 'Go kill yourself you idiot',
+    });
+
+    expect(reviewDoc.moderationStatus).toBe('pending');
+    expect(reviewDoc.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-screen when only rating changes (no title or content change)', async () => {
+    const reviewDoc = makeMockReview({ author: new Types.ObjectId(AUTHOR_ID) });
+    (Review.findOne as jest.Mock).mockResolvedValue(reviewDoc);
+
+    // A rating-only update must NOT call HuggingFace or local scorer.
+    // If it did, it would consume quota unnecessarily.
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    await reviewService.updateReview(REVIEW_ID, AUTHOR_ID, { rating: 3 });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    // moderationStatus should be unchanged from the original 'approved'
+    expect(reviewDoc.moderationStatus).toBe('approved');
+    expect(reviewDoc.save).toHaveBeenCalledTimes(1);
+
+    fetchSpy.mockRestore();
+  });
+});
