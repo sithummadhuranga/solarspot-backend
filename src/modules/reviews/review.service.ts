@@ -461,8 +461,20 @@ export async function flagReview(id: string, userId: string) {
   const userOid = new Types.ObjectId(userId);
   const alreadyFlagged = review.flaggedBy.some((f) => f.toString() === userId);
 
+  // Toggle: if user already flagged, retract the flag
   if (alreadyFlagged) {
-    throw ApiError.conflict('You have already flagged this review');
+    const newFlagCount = Math.max(0, review.flagCount - 1);
+    const unflagged = await Review.findOneAndUpdate(
+      { _id: id },
+      {
+        $pull: { flaggedBy: userOid },
+        $inc:  { flagCount: -1 },
+        $set:  { isFlagged: newFlagCount > 0 },
+      },
+      { new: true },
+    );
+    logger.info(`[reviews] User ${userId} removed flag from review ${id} (flagCount: ${unflagged?.flagCount})`);
+    return { action: 'unflagged' as const, flagCount: unflagged?.flagCount ?? 0, escalated: false };
   }
 
   const newFlagCount = review.flagCount + 1;
@@ -490,7 +502,7 @@ export async function flagReview(id: string, userId: string) {
   }
 
   logger.info(`[reviews] User ${userId} flagged review ${id} (flagCount: ${updated?.flagCount})`);
-  return { flagCount: updated?.flagCount ?? 0, escalated: shouldEscalate };
+  return { action: 'flagged' as const, flagCount: updated?.flagCount ?? 0, escalated: shouldEscalate };
 }
 
 /** GET /api/reviews/flagged — list flagged reviews for moderators */

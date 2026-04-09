@@ -402,6 +402,7 @@ describe('flagReview', () => {
 
     const result = await reviewService.flagReview(REVIEW_ID, AUTHOR_ID);
 
+    expect(result.action).toBe('flagged');
     expect(result.flagCount).toBe(1);
     expect(result.escalated).toBe(false);
     expect(Review.findOneAndUpdate).toHaveBeenCalledWith(
@@ -433,16 +434,28 @@ describe('flagReview', () => {
     expect(updateArg.$set).toMatchObject({ isFlagged: true, moderationStatus: 'flagged' });
   });
 
-  it('throws 409 if user already flagged the review', async () => {
+  it('unflags the review when the user has already flagged it', async () => {
     const reviewDoc = makeMockReview({
-      author: new Types.ObjectId(OTHER_ID),
+      author:    new Types.ObjectId(OTHER_ID),
       flaggedBy: [new Types.ObjectId(AUTHOR_ID)],
+      flagCount: 1,
+      isFlagged: true,
     });
     (Review.findOne as jest.Mock).mockResolvedValue(reviewDoc);
+    (Review.findOneAndUpdate as jest.Mock).mockResolvedValue({
+      ...reviewDoc,
+      flaggedBy: [],
+      flagCount: 0,
+      isFlagged: false,
+    });
 
-    await expect(
-      reviewService.flagReview(REVIEW_ID, AUTHOR_ID),
-    ).rejects.toMatchObject({ statusCode: 409 });
+    const result = await reviewService.flagReview(REVIEW_ID, AUTHOR_ID);
+
+    expect(result.action).toBe('unflagged');
+    expect(result.flagCount).toBe(0);
+    const updateArg = (Review.findOneAndUpdate as jest.Mock).mock.calls[0][1];
+    expect(updateArg.$pull).toMatchObject({ flaggedBy: expect.any(Types.ObjectId) });
+    expect(updateArg.$inc).toMatchObject({ flagCount: -1 });
   });
 
   it('throws 403 when trying to flag own review', async () => {
