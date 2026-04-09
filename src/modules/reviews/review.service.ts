@@ -317,8 +317,11 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
     throw ApiError.conflict('You have already reviewed this station');
   }
 
-  // Screen content through Perspective API (graceful degradation: null → approve)
-  const toxicityScore = await checkToxicity(content);
+  // Screen title and content together — a toxic title alone must be enough to reject.
+  // Combining both fields into one string keeps quota usage at 1 call per review
+  // while ensuring neither field can smuggle harmful text past the moderator.
+  const textToScreen = [title?.trim(), content].filter(Boolean).join('\n\n');
+  const toxicityScore = await checkToxicity(textToScreen);
 
   // Determine moderation status based on toxicity score:
   // - null (quota/error): approve by default, flag for manual check if score unavailable
@@ -363,14 +366,17 @@ export async function updateReview(id: string, authorId: string, input: UpdateRe
   }
 
   if (input.rating !== undefined) review.rating = input.rating;
-  if (input.title !== undefined) review.title = input.title;
 
-  // Re-screen content for toxicity whenever the text changes.
-  // An edited review may contain new harmful content not present in the original.
-  if (input.content !== undefined) {
-    review.content = input.content;
+  // Apply text field changes first so we screen the final combined state.
+  // Rescreening is triggered by ANY text change — a newly toxic title is just
+  // as harmful as toxic body content, even if the review body stays clean.
+  const textChanged = input.title !== undefined || input.content !== undefined;
+  if (input.title   !== undefined) review.title   = input.title;
+  if (input.content !== undefined) review.content = input.content;
 
-    const toxicityScore = await checkToxicity(input.content);
+  if (textChanged) {
+    const textToScreen = [review.title, review.content].filter(Boolean).join('\n\n');
+    const toxicityScore = await checkToxicity(textToScreen);
     if (toxicityScore !== null) {
       if (toxicityScore >= TOXICITY_AUTO_REJECT) {
         review.moderationStatus = 'rejected';
