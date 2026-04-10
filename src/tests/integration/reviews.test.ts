@@ -799,7 +799,7 @@ describe('Auto-reject — severely toxic content at creation', () => {
 
 describe('Community flag — auto-escalation to flagged status', () => {
   let escalateReviewId: string;
-  let escalateStationId: string;
+  let _escalateStationId: string;
 
   const userC = new Types.ObjectId();
   const userD = new Types.ObjectId();
@@ -815,7 +815,7 @@ describe('Community flag — auto-escalation to flagged status', () => {
       status:      'active',
       isActive:    true,
     });
-    escalateStationId = station._id.toString();
+    _escalateStationId = station._id.toString();
 
     const review = await Review.create({
       station:          station._id,
