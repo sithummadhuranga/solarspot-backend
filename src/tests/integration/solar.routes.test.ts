@@ -81,12 +81,19 @@ const fakeForecast = {
 };
 
 const fakeAnalytics = {
-  hasData:              true,
-  reportCount:          12,
-  avgSolarScore:        7.8,
-  avgAccuracyPct:       94.2,
-  avgEstimatedOutputKw: 4.0,
-  avgActualOutputKw:    3.8,
+  hasData: true,
+  overview: {
+    totalReports:        12,
+    avgSolarScore:       7.8,
+    avgAccuracyPct:      94.2,
+    avgEstimatedOutputKw: 4.0,
+    avgActualOutputKw:   3.8,
+    maxSolarScore:       9.5,
+    minSolarScore:       5.0,
+  },
+  byDayOfWeek:          [],
+  byHourOfDay:          [],
+  accuracyDistribution: [],
   last30Days:           [
     { _id: '2026-02-20', avgScore: 7.5, reportCount: 3 },
   ],
@@ -258,13 +265,17 @@ describe('GET /api/solar/stations/:stationId/analytics', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.avgSolarScore).toBe(7.8);
+    expect(res.body.data.overview.avgSolarScore).toBe(7.8);
   });
 
   it('200 — hasData: false when no reports exist', async () => {
     mockSvc.getStationAnalytics.mockResolvedValue({
-      hasData: false, reportCount: 0, avgSolarScore: 0,
-      avgAccuracyPct: null, avgEstimatedOutputKw: 0, avgActualOutputKw: null, last30Days: [],
+      hasData: false,
+      overview: {
+        totalReports: 0, avgSolarScore: 0, avgEstimatedOutputKw: 0,
+        avgActualOutputKw: 0, avgAccuracyPct: 0, maxSolarScore: 0, minSolarScore: 0,
+      },
+      byDayOfWeek: [], byHourOfDay: [], accuracyDistribution: [], last30Days: [],
     });
 
     const res = await request(app).get(`/api/solar/stations/${STATION_ID}/analytics`);
