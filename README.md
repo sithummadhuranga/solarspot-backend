@@ -41,10 +41,12 @@ npm run dev
 | `JWT_REFRESH_EXPIRES` | No | `7d` | Refresh token lifetime |
 | `OPENWEATHERMAP_API_KEY` | Yes | — | OpenWeatherMap API key |
 | `PERSPECTIVE_API_KEY` | Yes | — | Google Perspective API key |
-| `BREVO_SMTP_HOST` | Yes | — | SMTP host |
-| `BREVO_SMTP_PORT` | No | `587` | SMTP port |
-| `BREVO_SMTP_USER` | Yes | — | SMTP username |
-| `BREVO_SMTP_PASS` | Yes | — | SMTP password |
+| `EMAIL_TRANSPORT` | No | `smtp` | `smtp`, `brevo-api`, or preview via `EMAIL_PREVIEW=true` |
+| `BREVO_API_KEY` | No | — | Brevo HTTPS API key; recommended on Render free |
+| `EMAIL_HOST` / `BREVO_SMTP_HOST` | No | `smtp-relay.brevo.com` | SMTP host |
+| `EMAIL_PORT` / `BREVO_SMTP_PORT` | No | `587` | SMTP port |
+| `EMAIL_USER` / `BREVO_SMTP_USER` | No | — | SMTP username |
+| `EMAIL_PASS` / `BREVO_SMTP_PASS` | No | — | SMTP password |
 | `EMAIL_FROM` | No | `noreply@solarspot.app` | Sender email |
 | `FRONTEND_URL` | Yes | — | Frontend URL for CORS |
 
@@ -126,6 +128,20 @@ npx artillery run src/tests/performance/artillery.yml  # load test
 1. Push to `main` branch
 2. Render auto-deploys via deploy hook
 3. MongoDB Atlas M0 free tier for production database
+
+## Email on Render Free
+
+Render free web services block outbound SMTP traffic on ports `25`, `465`, and `587`, so `nodemailer` SMTP transports will time out in production even if they work locally.
+
+Use Brevo's HTTPS API instead:
+
+```bash
+EMAIL_TRANSPORT=brevo-api
+BREVO_API_KEY=your-brevo-api-key
+EMAIL_PREVIEW=false
+```
+
+SMTP remains supported for local development and paid Render instances.
 
 ## Team — Module Ownership
 
