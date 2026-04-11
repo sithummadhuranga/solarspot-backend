@@ -5,7 +5,7 @@
 
 import { Types } from 'mongoose';
 
-var mockSession = {
+const mockSession = {
   withTransaction: jest.fn().mockImplementation((fn: () => Promise<void>) => fn()),
   endSession: jest.fn().mockResolvedValue(undefined),
 };
