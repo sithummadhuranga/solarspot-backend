@@ -131,6 +131,28 @@ export const getUserEffectivePermissions = asyncHandler(async (req: AuthRequest,
 
 /**
  * @swagger
+ * /api/permissions/admin/users/{id}/permissions/matrix:
+ *   get:
+ *     summary: Get the effective permission matrix for a user
+ *     tags: [Permissions]
+ *     security: [{ bearerAuth: [] }]
+ *     x-permission: permissions.read
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Permission matrix with role grants and user overrides
+ */
+export const getUserPermissionMatrix = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const data = await PermissionService.getUserPermissionMatrix(String(req.params.id));
+  return ApiResponse.success(res, data, 'User permission matrix fetched');
+});
+
+/**
+ * @swagger
  * /api/permissions/admin/users/{id}/permissions:
  *   post:
  *     summary: Override a permission for a user

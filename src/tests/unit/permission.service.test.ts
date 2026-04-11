@@ -5,6 +5,11 @@
 
 import { Types } from 'mongoose';
 
+var mockSession = {
+  withTransaction: jest.fn().mockImplementation((fn: () => Promise<void>) => fn()),
+  endSession: jest.fn().mockResolvedValue(undefined),
+};
+
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 jest.mock('@modules/permissions/permission.model', () => ({
@@ -32,11 +37,7 @@ jest.mock('@/container', () => ({
 }));
 jest.mock('mongoose', () => {
   const actual = jest.requireActual('mongoose');
-  const mockSession = {
-    withTransaction: jest.fn().mockImplementation((fn: () => Promise<void>) => fn()),
-    endSession: jest.fn().mockResolvedValue(undefined),
-  };
-  return { ...actual, startSession: jest.fn().mockResolvedValue(mockSession) };
+  return { ...actual, startSession: jest.fn().mockImplementation(async () => mockSession) };
 });
 
 import PermissionService             from '@modules/permissions/permission.service';
@@ -162,6 +163,81 @@ describe('PermissionService.overrideUserPermission', () => {
     );
     expect(result.effect).toBe('grant');
     expect(mockAuditLog.create).toHaveBeenCalled();
+  });
+
+  it('should retry without a transaction when Mongo transactions are unavailable', async () => {
+    const { User: MockUserModel } = require('@modules/users/user.model');
+    (MockUserModel.findById as jest.Mock).mockResolvedValue({ _id: USER_ID } as never);
+    (mockPermission.findById as jest.Mock).mockResolvedValue({ _id: PERM_ID } as never);
+
+    mockSession.withTransaction.mockRejectedValueOnce(
+      new Error('Transaction numbers are only allowed on a replica set member or mongos'),
+    );
+
+    const overrideDoc = { _id: new Types.ObjectId(), user: USER_ID, permission: PERM_ID, effect: 'grant' };
+    (mockOverride.findOneAndUpdate as jest.Mock).mockResolvedValue(overrideDoc as never);
+    (mockAuditLog.create as jest.Mock).mockResolvedValue([{}]);
+
+    const result = await PermissionService.overrideUserPermission(
+      USER_ID.toString(),
+      PERM_ID.toString(),
+      'grant',
+      'actor-id',
+    );
+
+    expect(result.effect).toBe('grant');
+    expect(mockSession.withTransaction).toHaveBeenCalled();
+    expect(mockOverride.findOneAndUpdate).toHaveBeenCalledWith(
+      { user: USER_ID.toString(), permission: PERM_ID.toString() },
+      { $set: { effect: 'grant', reason: undefined, grantedBy: 'actor-id', expiresAt: null } },
+      expect.not.objectContaining({ session: expect.anything() }),
+    );
+  });
+});
+
+// ─── getUserPermissionMatrix ─────────────────────────────────────────────────
+
+describe('PermissionService.getUserPermissionMatrix', () => {
+  it('should return inherited and override-based permission states', async () => {
+    const basePermissionId = new Types.ObjectId();
+    const deniedPermissionId = new Types.ObjectId();
+
+    const { User: MockUserModel } = require('@modules/users/user.model');
+    (MockUserModel.findById as jest.Mock).mockReturnValue({
+      populate: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue({ _id: USER_ID, role: { _id: ROLE_ID } } as never),
+    });
+
+    (mockPermission.find as jest.Mock).mockReturnValue({
+      sort: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([
+        { _id: basePermissionId, action: 'stations.read', component: 'stations', resource: 'stations' },
+        { _id: deniedPermissionId, action: 'users.read-list', component: 'users', resource: 'users' },
+      ]),
+    });
+
+    (mockRolePerm.find as jest.Mock).mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([{ permission: basePermissionId }]),
+    });
+
+    (mockOverride.find as jest.Mock).mockReturnValue({
+      populate: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([
+        {
+          permission: { _id: deniedPermissionId, action: 'users.read-list', component: 'users', resource: 'users' },
+          effect: 'deny',
+          reason: 'Temporary suspension',
+          expiresAt: null,
+        },
+      ]),
+    });
+
+    const result = await PermissionService.getUserPermissionMatrix(USER_ID.toString());
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ allowed: true, source: 'role', roleGranted: true });
+    expect(result[1]).toMatchObject({ allowed: false, source: 'override-deny', overrideEffect: 'deny' });
   });
 });
 
