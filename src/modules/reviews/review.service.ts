@@ -42,6 +42,7 @@ const TOXICITY_PENDING_THRESHOLD = 0.60;
  * moderationStatus to 'flagged'. Keeps the moderation queue manageable.
  */
 const FLAG_AUTO_ESCALATE_THRESHOLD = 3;
+const DUPLICATE_REVIEW_MESSAGE = 'You have already reviewed this station. Edit or delete your existing review before posting a new one.';
 
 type DuplicateKeyError = Error & {
   code?: number;
@@ -337,7 +338,7 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
     isActive: true,
   });
   if (existing) {
-    throw ApiError.conflict('You have already reviewed this station');
+    throw ApiError.conflict(DUPLICATE_REVIEW_MESSAGE);
   }
 
   // Screen title and content together — a toxic title alone must be enough to reject.
@@ -376,7 +377,7 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
     });
   } catch (error) {
     if (isReviewDuplicateKeyError(error)) {
-      throw ApiError.conflict('You have already reviewed this station. Edit or delete your existing review before posting a new one.');
+      throw ApiError.conflict(DUPLICATE_REVIEW_MESSAGE);
     }
     throw error;
   }
