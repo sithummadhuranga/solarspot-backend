@@ -125,6 +125,20 @@ if (config.NODE_ENV !== 'production') {
   logger.info(`API docs available at /api/docs`);
 }
 
+function buildFrontendRedirectUrl(pathname: string): string {
+  const base = config.FRONTEND_URL.replace(/\/+$/, '');
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `${base}${normalizedPath}`;
+}
+
+app.get('/verify-email/:token', (req: Request, res: Response) => {
+  return res.redirect(302, buildFrontendRedirectUrl(`/verify-email/${encodeURIComponent(String(req.params.token))}`));
+});
+
+app.get('/reset-password/:token', (req: Request, res: Response) => {
+  return res.redirect(302, buildFrontendRedirectUrl(`/reset-password/${encodeURIComponent(String(req.params.token))}`));
+});
+
 // ─── Module routes ─────────────────────────────────────────────────────────────
 import authRouter        from '@modules/auth/auth.routes';
 import usersRouter       from '@modules/users/user.routes';

@@ -55,8 +55,8 @@ services:
       - key: APP_NAME
         value: SolarSpot
 
-      # Your Render service public URL — needed for email verify/reset links.
-      # Set AFTER first deploy when you know the URL, e.g. https://solarspot-api.onrender.com
+      # Your backend service public URL.
+      # User-facing email links and redirect targets should use FRONTEND_URL instead.
       - key: APP_URL
         sync: false
 
@@ -87,7 +87,8 @@ services:
         generateValue: true
 
       # ── CORS ─────────────────────────────────────────────────────────────────
-      # Must match your Vercel URL exactly — no trailing slash.
+      # Must match your frontend URL exactly — no trailing slash.
+      # This is the user-facing app URL used in email verification/reset links and backend fallback redirects.
       - key: FRONTEND_URL
         sync: false          # e.g. https://solarspot.vercel.app
 
