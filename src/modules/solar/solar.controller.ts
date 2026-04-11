@@ -203,7 +203,7 @@ export const getStationAnalytics = asyncHandler(async (req: AuthRequest, res: Re
 export const getReports = asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = await solarService.getReports(
     req.query as unknown as ReportQuery,
-    req.user ? { _id: req.user._id, role: req.user.role } : undefined,
+    req.user ? { _id: req.user._id, role: req.user.role, roleLevel: req.user.roleLevel } : undefined,
   );
   ApiResponse.paginated(res, result.data, result.pagination, 'Reports fetched');
 });
@@ -241,7 +241,7 @@ export const getReports = asyncHandler(async (req: AuthRequest, res: Response) =
 export const getReportById = asyncHandler(async (req: AuthRequest, res: Response) => {
   const report = await solarService.getReportById(
     req.params['id'] as string,
-    req.user ? { _id: req.user._id, role: req.user.role } : undefined,
+    req.user ? { _id: req.user._id, role: req.user.role, roleLevel: req.user.roleLevel } : undefined,
   );
   ApiResponse.success(res, report);
 });
@@ -344,6 +344,7 @@ export const updateReport = asyncHandler(async (req: AuthRequest, res: Response)
     req.body as UpdateReportDto,
     req.user!._id,
     req.user!.role,
+    req.user!.roleLevel,
   );
   ApiResponse.success(res, report, 'Report updated');
 });
@@ -374,7 +375,12 @@ export const updateReport = asyncHandler(async (req: AuthRequest, res: Response)
  *     x-component: solar
  */
 export const deleteReport = asyncHandler(async (req: AuthRequest, res: Response) => {
-  await solarService.deleteReport(req.params['id'] as string, req.user!._id, req.user!.role);
+  await solarService.deleteReport(
+    req.params['id'] as string,
+    req.user!._id,
+    req.user!.role,
+    req.user!.roleLevel,
+  );
   ApiResponse.noContent(res);
 });
 
@@ -419,6 +425,7 @@ export const publishReport = asyncHandler(async (req: AuthRequest, res: Response
     req.params['id'] as string,
     req.user!._id,
     req.user!.role,
+    req.user!.roleLevel,
   );
   ApiResponse.success(res, report, 'Report published');
 });
@@ -464,6 +471,7 @@ export const archiveReport = asyncHandler(async (req: AuthRequest, res: Response
     req.params['id'] as string,
     req.user!._id,
     req.user!.role,
+    req.user!.roleLevel,
   );
   ApiResponse.success(res, report, 'Report archived');
 });
