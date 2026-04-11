@@ -166,6 +166,22 @@ describe('createReview', () => {
     expect(Review.create).not.toHaveBeenCalled();
   });
 
+  it('translates duplicate key write races into a 409 conflict', async () => {
+    (Station.findOne as jest.Mock).mockResolvedValue(makeMockStation());
+    (Review.findOne as jest.Mock).mockResolvedValue(null);
+    (Review.create as jest.Mock).mockRejectedValue(Object.assign(new Error('E11000 duplicate key error'), {
+      code: 11000,
+      keyPattern: { station: 1, author: 1 },
+    }));
+
+    await expect(
+      reviewService.createReview(AUTHOR_ID, validInput),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'You have already reviewed this station. Edit or delete your existing review before posting a new one.',
+    });
+  });
+
   it('throws 404 when station does not exist', async () => {
     (Station.findOne as jest.Mock).mockResolvedValue(null);
 

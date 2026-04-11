@@ -2,6 +2,26 @@ import { Request, Response, NextFunction } from 'express';
 import ApiError from '@utils/ApiError';
 import logger from '@utils/logger';
 
+type DuplicateKeyError = Error & {
+  code?: number;
+  keyPattern?: Record<string, unknown>;
+};
+
+function isDuplicateKeyError(error: unknown): error is DuplicateKeyError {
+  return typeof error === 'object' && error !== null && 'code' in error
+    && (error as { code?: unknown }).code === 11000;
+}
+
+function getDuplicateKeyMessage(error: DuplicateKeyError): string {
+  const keyPattern = error.keyPattern ?? {};
+
+  if ('station' in keyPattern && 'author' in keyPattern) {
+    return 'You have already reviewed this station. Edit or delete your existing review before posting a new one.';
+  }
+
+  return 'A record with the same value already exists.';
+}
+
 /**
  * Global error-handling middleware.
  * Must be mounted LAST in app.ts after all routes.
@@ -35,6 +55,16 @@ export const errorHandler = (
       message:    err.message,
       errors:     err.errors ?? [],
       statusCode: err.statusCode,
+    });
+    return;
+  }
+
+  if (isDuplicateKeyError(err)) {
+    res.status(409).json({
+      success: false,
+      message: getDuplicateKeyMessage(err),
+      errors: [],
+      statusCode: 409,
     });
     return;
   }
