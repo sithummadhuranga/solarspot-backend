@@ -48,7 +48,7 @@ services:
 
       # ── Database (set in dashboard) ─────────────────────────────────────────
       - key: MONGODB_URI
-        sync: false          # paste your MongoDB Atlas SRV connection string
+        sync: false          # full Atlas URI, e.g. mongodb+srv://user:pass@cluster0.abcde.mongodb.net/solarspot?retryWrites=true&w=majority
 
       # ── JWT (auto-generated — copy values to the frontend env if needed) ────
       # ── App identity ─────────────────────────────────────────────────────────

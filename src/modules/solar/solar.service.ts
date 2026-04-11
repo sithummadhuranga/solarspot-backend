@@ -52,6 +52,7 @@ export interface ReportQuery {
 export interface ViewerContext {
   _id: string;
   role: string;
+  roleLevel?: number;
 }
 
 export interface PaginatedResult<T> {
@@ -137,12 +138,51 @@ function userObjectId(value: string): Types.ObjectId {
   return new Types.ObjectId(value);
 }
 
-function isPrivilegedViewer(viewer?: ViewerContext): boolean {
-  return Boolean(viewer && ['admin', 'moderator'].includes(viewer.role));
+function extractReferenceId(value: unknown): string | null {
+  if (!value) return null;
+
+  if (typeof value === 'string') return value;
+
+  if (value instanceof Types.ObjectId) {
+    return value.toString();
+  }
+
+  if (typeof value === 'object' && '_id' in value) {
+    const nestedId = (value as { _id?: unknown })._id;
+    if (typeof nestedId === 'string') return nestedId;
+    if (nestedId instanceof Types.ObjectId) return nestedId.toString();
+  }
+
+  if (typeof value === 'object' && typeof (value as { toString?: () => string }).toString === 'function') {
+    const stringified = (value as { toString: () => string }).toString();
+    return stringified && stringified !== '[object Object]' ? stringified : null;
+  }
+
+  return null;
+}
+
+function getViewerRoleLevel(viewer?: ViewerContext): number {
+  return viewer?.roleLevel ?? 0;
+}
+
+function isAdminViewer(viewer?: ViewerContext): boolean {
+  return getViewerRoleLevel(viewer) >= 4;
+}
+
+function canModerateSolarReports(viewer?: ViewerContext): boolean {
+  return getViewerRoleLevel(viewer) >= 3;
+}
+
+function isReportOwner(
+  report: Pick<ISolarReport, 'submittedBy'>,
+  viewer?: Pick<ViewerContext, '_id'>,
+): boolean {
+  const submittedById = extractReferenceId(report.submittedBy);
+  return Boolean(viewer?._id && submittedById && submittedById === viewer._id);
 }
 
 function canManageReport(report: Pick<ISolarReport, 'submittedBy'>, viewer: ViewerContext): boolean {
-  return report.submittedBy.toString() === viewer._id || isPrivilegedViewer(viewer);
+  return isReportOwner(report, viewer) || isAdminViewer(viewer);
 }
 
 function canViewReport(
@@ -150,8 +190,8 @@ function canViewReport(
   viewer?: ViewerContext,
 ): boolean {
   if (!report.isActive) return false;
-  if (isPrivilegedViewer(viewer)) return true;
-  if (viewer && report.submittedBy.toString() === viewer._id) return true;
+  if (canModerateSolarReports(viewer)) return true;
+  if (viewer && isReportOwner(report, viewer)) return true;
   return report.status === 'published' && report.isPublic === true;
 }
 
@@ -360,7 +400,7 @@ export async function getReports(
     filter['visitedAt'] = range;
   }
 
-  if (isPrivilegedViewer(viewer)) {
+  if (canModerateSolarReports(viewer)) {
     // full visibility for moderators/admins
   } else if (viewer?._id && requestedUserId === viewer._id) {
     // own report management view
@@ -434,12 +474,15 @@ export async function updateReport(
   dto: UpdateReportDto,
   userId: string,
   userRole: string,
+  userRoleLevel = 0,
 ): Promise<ISolarReport> {
+  const viewer: ViewerContext = { _id: userId, role: userRole, roleLevel: userRoleLevel };
+
   const updatedReport = await runWithOptionalTransaction(async (session) => {
     const reportQuery = SolarReport.findOne({ _id: id, isActive: true });
     const report = session ? await reportQuery.session(session) : await reportQuery;
     if (!report) throw ApiError.notFound('Solar report not found');
-    if (!canManageReport(report, { _id: userId, role: userRole })) {
+    if (!canManageReport(report, viewer)) {
       throw ApiError.forbidden('You can only edit your own reports.');
     }
 
@@ -494,12 +537,19 @@ export async function updateReport(
   return updatedReport;
 }
 
-export async function deleteReport(id: string, userId: string, userRole: string): Promise<void> {
+export async function deleteReport(
+  id: string,
+  userId: string,
+  userRole: string,
+  userRoleLevel = 0,
+): Promise<void> {
+  const viewer: ViewerContext = { _id: userId, role: userRole, roleLevel: userRoleLevel };
+
   await runWithOptionalTransaction(async (session) => {
     const reportQuery = SolarReport.findOne({ _id: id, isActive: true });
     const report = session ? await reportQuery.session(session) : await reportQuery;
     if (!report) throw ApiError.notFound('Solar report not found');
-    if (!canManageReport(report, { _id: userId, role: userRole })) {
+    if (!canManageReport(report, viewer)) {
       throw ApiError.forbidden('You can only delete your own reports.');
     }
 
@@ -537,21 +587,29 @@ export async function deleteReport(id: string, userId: string, userRole: string)
   logger.info('deleteReport: solar report soft-deleted', { reportId: id, deletedBy: userId });
 }
 
-export async function publishReport(id: string, userId: string, userRole: string): Promise<ISolarReport> {
+export async function publishReport(
+  id: string,
+  userId: string,
+  userRole: string,
+  userRoleLevel = 0,
+): Promise<ISolarReport> {
+  const viewer: ViewerContext = { _id: userId, role: userRole, roleLevel: userRoleLevel };
+
   const publishedReport = await runWithOptionalTransaction(async (session) => {
     const reportQuery = SolarReport.findOne({ _id: id, isActive: true });
     const report = session ? await reportQuery.session(session) : await reportQuery;
     if (!report) throw ApiError.notFound('Solar report not found');
-    if (!canManageReport(report, { _id: userId, role: userRole })) {
-      throw ApiError.forbidden('You can only publish your own reports.');
-    }
 
     if (report.status === 'published') {
       throw ApiError.badRequest('Report is already published.');
     }
 
-    if (report.status === 'archived' && !isPrivilegedViewer({ _id: userId, role: userRole })) {
-      throw ApiError.forbidden('Only moderators and admins can restore archived reports.');
+    if (report.status === 'archived') {
+      if (!canModerateSolarReports(viewer)) {
+        throw ApiError.forbidden('Only moderators, weather analysts, and admins can restore archived reports.');
+      }
+    } else if (!canManageReport(report, viewer)) {
+      throw ApiError.forbidden('You can only publish your own reports.');
     }
 
     const previousStatus = report.status;
@@ -591,9 +649,16 @@ export async function publishReport(id: string, userId: string, userRole: string
   return publishedReport;
 }
 
-export async function archiveReport(id: string, userId: string, userRole: string): Promise<ISolarReport> {
-  if (!isPrivilegedViewer({ _id: userId, role: userRole })) {
-    throw ApiError.forbidden('Only moderators and admins can archive solar reports');
+export async function archiveReport(
+  id: string,
+  userId: string,
+  userRole: string,
+  userRoleLevel = 0,
+): Promise<ISolarReport> {
+  const viewer: ViewerContext = { _id: userId, role: userRole, roleLevel: userRoleLevel };
+
+  if (!canModerateSolarReports(viewer)) {
+    throw ApiError.forbidden('Only moderators, weather analysts, and admins can archive solar reports');
   }
 
   const archivedReport = await runWithOptionalTransaction(async (session) => {
