@@ -15,10 +15,65 @@
 
 import path from 'path';
 import fs from 'fs';
+import axios from 'axios';
 import nodemailer, { Transporter } from 'nodemailer';
 import { config } from '@config/env';
 import logger from '@utils/logger';
 import { IUserForEmail } from '@/types';
+
+type EmailTransportMode = 'preview' | 'smtp' | 'brevo-api';
+
+function parseMailbox(value: string): { email: string; name?: string } {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(?:"?([^"<>]+)"?\s*)?<([^<>]+)>$/);
+
+  if (match) {
+    const [, name, email] = match;
+    return {
+      email: email.trim(),
+      name: name?.trim() || undefined,
+    };
+  }
+
+  return { email: trimmed };
+}
+
+function normalizeRecipients(value: nodemailer.SendMailOptions['to']): Array<{ email: string; name?: string }> {
+  const entries = Array.isArray(value) ? value : value ? [value] : [];
+
+  return entries.flatMap((entry) => {
+    if (!entry) return [];
+
+    if (typeof entry === 'string') {
+      return entry
+        .split(',')
+        .map(part => part.trim())
+        .filter(Boolean)
+        .map(parseMailbox);
+    }
+
+    if (typeof entry === 'object' && 'address' in entry && typeof entry.address === 'string') {
+      return [{
+        email: entry.address.trim(),
+        name: typeof entry.name === 'string' ? entry.name.trim() || undefined : undefined,
+      }];
+    }
+
+    return [];
+  });
+}
+
+function resolveTransportMode(): EmailTransportMode {
+  if (config.EMAIL_PREVIEW || config.EMAIL_TRANSPORT === 'preview') {
+    return 'preview';
+  }
+
+  if (config.EMAIL_TRANSPORT === 'brevo-api') {
+    return 'brevo-api';
+  }
+
+  return 'smtp';
+}
 
 // ─── Mail transport abstraction (DIP) ───────────────────────────────────────
 export interface IMailTransport {
@@ -42,6 +97,61 @@ class NodemailerTransport implements IMailTransport {
   }
 }
 
+class BrevoApiTransport implements IMailTransport {
+  async sendMail(options: nodemailer.SendMailOptions): Promise<void> {
+    if (!config.BREVO_API_KEY) {
+      throw new Error('BREVO_API_KEY is required when EMAIL_TRANSPORT=brevo-api');
+    }
+
+    const to = normalizeRecipients(options.to);
+    if (to.length === 0) {
+      throw new Error('EmailService.send called without a valid recipient');
+    }
+
+    const sender = config.EMAIL_FROM_ADDRESS
+      ? { email: config.EMAIL_FROM_ADDRESS, name: config.EMAIL_FROM_NAME }
+      : normalizeRecipients(options.from)[0];
+
+    if (!sender?.email) {
+      throw new Error('EmailService.send called without a valid sender address');
+    }
+
+    try {
+      await axios.post(
+        `${config.BREVO_API_BASE_URL.replace(/\/+$/, '')}/smtp/email`,
+        {
+          sender,
+          to,
+          subject: options.subject,
+          htmlContent: typeof options.html === 'string' ? options.html : String(options.html ?? ''),
+        },
+        {
+          headers: {
+            accept: 'application/json',
+            'api-key': config.BREVO_API_KEY,
+            'content-type': 'application/json',
+          },
+          timeout: 15000,
+        },
+      );
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const responseData = error.response?.data;
+        const details = typeof responseData === 'string'
+          ? responseData
+          : responseData
+            ? JSON.stringify(responseData)
+            : error.message;
+
+        throw new Error(`Brevo API request failed${status ? ` with status ${status}` : ''}: ${details}`);
+      }
+
+      throw error;
+    }
+  }
+}
+
 // In dev/test: logs email HTML to console instead of sending (EMAIL_PREVIEW=true)
 class PreviewTransport implements IMailTransport {
   async sendMail(options: nodemailer.SendMailOptions): Promise<void> {
@@ -53,12 +163,25 @@ class PreviewTransport implements IMailTransport {
 // ─── EmailService ────────────────────────────────────────────────────────────
 export class EmailService {
   private transport: IMailTransport;
+  private readonly transportMode: EmailTransportMode;
   private readonly templatesDir = path.join(__dirname, '../templates');
 
   constructor(transport?: IMailTransport) {
-    this.transport = transport ?? (config.EMAIL_PREVIEW
-      ? new PreviewTransport()
-      : new NodemailerTransport());
+    this.transportMode = resolveTransportMode();
+    this.transport = transport ?? this.createTransport(this.transportMode);
+    logger.info(`EmailService initialized with ${this.transportMode} transport`);
+  }
+
+  private createTransport(mode: EmailTransportMode): IMailTransport {
+    switch (mode) {
+      case 'preview':
+        return new PreviewTransport();
+      case 'brevo-api':
+        return new BrevoApiTransport();
+      case 'smtp':
+      default:
+        return new NodemailerTransport();
+    }
   }
 
   // ─── Core send helper — NEVER call directly from outside this class ────────
@@ -91,7 +214,7 @@ export class EmailService {
       });
     } catch (err) {
       // Email failure must never crash the app — log and continue
-      logger.error(`EmailService.send failed for template "${templateName}":`, err);
+      logger.error(`EmailService.send failed for template "${templateName}" via ${this.transportMode}:`, err);
     }
   }
 
