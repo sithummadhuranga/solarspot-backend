@@ -91,7 +91,16 @@ services:
       - key: FRONTEND_URL
         sync: false          # e.g. https://solarspot.vercel.app
 
-      # ── Email — Brevo SMTP (set in dashboard) ────────────────────────────────
+      # ── Email — Brevo (set in dashboard) ─────────────────────────────────────
+      # Render free web services block outbound SMTP on ports 25, 465, and 587.
+      # Use Brevo's HTTPS API transport on the free plan.
+      - key: EMAIL_TRANSPORT
+        value: brevo-api
+
+      - key: BREVO_API_KEY
+        sync: false          # Brevo API key for HTTPS email sending on free Render
+
+      # Optional SMTP settings for local dev or paid Render plans.
       # Variable names must match exactly what env.ts reads via process.env.*
       - key: EMAIL_HOST
         value: smtp-relay.brevo.com

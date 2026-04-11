@@ -32,6 +32,10 @@ export const config = {
   COOKIE_SECRET: process.env.COOKIE_SECRET as string,              // REQUIRED — min 32 chars
 
   // ── Email (Brevo SMTP) ────────────────────────────────────
+  // Supports preview, SMTP, and Brevo's HTTPS API transport.
+  EMAIL_TRANSPORT:    (process.env.EMAIL_TRANSPORT ?? '').trim().toLowerCase(),
+  BREVO_API_KEY:      process.env.BREVO_API_KEY ?? '',
+  BREVO_API_BASE_URL: process.env.BREVO_API_BASE_URL ?? 'https://api.brevo.com/v3',
   // Supports both EMAIL_* and legacy BREVO_SMTP_* naming in .env
   EMAIL_HOST:         process.env.EMAIL_HOST         ?? process.env.BREVO_SMTP_HOST ?? 'smtp-relay.brevo.com',
   EMAIL_PORT:         parseInt(process.env.EMAIL_PORT ?? process.env.BREVO_SMTP_PORT ?? '587', 10),
