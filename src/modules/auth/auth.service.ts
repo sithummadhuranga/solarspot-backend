@@ -61,6 +61,12 @@ function generateSecureToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function buildFrontendUrl(pathname: string): string {
+  const base = config.FRONTEND_URL.replace(/\/+$/, '');
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `${base}${normalizedPath}`;
+}
+
 export class AuthService {
   /**
    * POST /api/auth/register
@@ -127,7 +133,7 @@ export class AuthService {
     }
 
     // Email is sent outside the transaction — failure doesn't roll back the user
-    const verifyUrl = `${config.APP_URL}/verify-email/${emailVerifyToken}`;
+    const verifyUrl = buildFrontendUrl(`/verify-email/${emailVerifyToken}`);
     container.emailService
       .sendVerifyEmail({ _id: createdUserId, displayName, email }, verifyUrl)
       .catch(err => logger.error('AuthService: verify email failed to send', err));
@@ -281,7 +287,7 @@ export class AuthService {
     user.passwordResetExpires = new Date(Date.now() + PASSWORD_RESET_EXPIRY_MINUTES * 60 * 1000);
     await user.save({ validateBeforeSave: false });
 
-    const resetUrl = `${config.APP_URL}/reset-password/${resetToken}`;
+    const resetUrl = buildFrontendUrl(`/reset-password/${resetToken}`);
     container.emailService
       .sendPasswordReset({ _id: user._id, displayName: user.displayName, email: user.email }, resetUrl)
       .catch(err => logger.error('AuthService: password reset email failed to send', err));

@@ -23,6 +23,10 @@ import { IUserForEmail } from '@/types';
 
 type EmailTransportMode = 'preview' | 'smtp' | 'brevo-api';
 
+function getPublicAppUrl(): string {
+  return config.FRONTEND_URL.replace(/\/+$/, '');
+}
+
 function parseMailbox(value: string): { email: string; name?: string } {
   const trimmed = value.trim();
   const match = trimmed.match(/^(?:"?([^"<>]+)"?\s*)?<([^<>]+)>$/);
@@ -198,7 +202,7 @@ export class EmailService {
       // Replace all {{VARIABLE}} placeholders — OCP: never modify this line
       const allVars = {
         APP_NAME: config.APP_NAME,
-        APP_URL: config.APP_URL,
+        APP_URL: getPublicAppUrl(),
         YEAR: String(new Date().getFullYear()),
         ...vars,
       };
@@ -255,7 +259,7 @@ export class EmailService {
       'welcome',
       {
         USER_NAME: user.displayName,
-        MAP_URL: `${config.APP_URL}/map`,
+        MAP_URL: `${getPublicAppUrl()}/map`,
       },
     );
   }

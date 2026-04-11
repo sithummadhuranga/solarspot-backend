@@ -39,6 +39,7 @@ npm run dev
 | `JWT_REFRESH_SECRET` | Yes | — | Refresh token secret |
 | `JWT_ACCESS_EXPIRES` | No | `15m` | Access token lifetime |
 | `JWT_REFRESH_EXPIRES` | No | `7d` | Refresh token lifetime |
+| `APP_URL` | No | — | Backend/public API base URL |
 | `OPENWEATHERMAP_API_KEY` | Yes | — | OpenWeatherMap API key |
 | `PERSPECTIVE_API_KEY` | Yes | — | Google Perspective API key |
 | `EMAIL_TRANSPORT` | No | `smtp` | `smtp`, `brevo-api`, or preview via `EMAIL_PREVIEW=true` |
@@ -48,7 +49,7 @@ npm run dev
 | `EMAIL_USER` / `BREVO_SMTP_USER` | No | — | SMTP username |
 | `EMAIL_PASS` / `BREVO_SMTP_PASS` | No | — | SMTP password |
 | `EMAIL_FROM` | No | `noreply@solarspot.app` | Sender email |
-| `FRONTEND_URL` | Yes | — | Frontend URL for CORS |
+| `FRONTEND_URL` | Yes | — | Frontend URL for CORS, email links, and auth-page redirects |
 
 ## Scripts
 
