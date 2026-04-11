@@ -134,13 +134,36 @@ describe('GET /api/admin/users/:id/permissions', () => {
   });
 });
 
+// ─── GET /api/admin/users/:id/permissions/matrix ────────────────────────────
+
+describe('GET /api/admin/users/:id/permissions/matrix', () => {
+  it('200 — returns permission states with role and override sources', async () => {
+    const perm = await Permission.findOne({ action: 'users.read-list' }).lean();
+
+    await request(app)
+      .post(`/api/permissions/admin/users/${targetUserId}/permissions`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ permissionId: String(perm!._id), effect: 'grant' });
+
+    const res = await request(app)
+      .get(`/api/permissions/admin/users/${targetUserId}/permissions/matrix`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    const matching = res.body.data.find((item: { permission: { action: string }; source: string; allowed: boolean }) => item.permission.action === 'users.read-list');
+    expect(matching).toBeDefined();
+    expect(matching).toMatchObject({ allowed: true, source: 'override-grant' });
+  });
+});
+
 // ─── POST /api/admin/users/:id/permissions ───────────────────────────────────
 
 describe('POST /api/admin/users/:id/permissions', () => {
   let grantedPermId: string;
 
   it('201 — creates a grant override for user', async () => {
-    const perm = await Permission.findOne({ action: 'stations.read' }).lean();
+    const perm = await Permission.findOne({ action: 'users.read-list' }).lean();
     grantedPermId = String(perm!._id);
 
     const res = await request(app)
