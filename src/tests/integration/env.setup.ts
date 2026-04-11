@@ -21,3 +21,7 @@ process.env.PERSPECTIVE_API_KEY  = 'test-perspective-key';
 process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
 process.env.CLOUDINARY_API_KEY    = 'test-key';
 process.env.CLOUDINARY_API_SECRET = 'test-secret';
+
+// Force the local regex toxicity scorer — integration tests must be deterministic
+// and must not depend on external API availability or quotas.
+process.env.HUGGINGFACE_API_KEY = '';

@@ -31,6 +31,7 @@ export const QUOTA_LIMITS: Record<ThirdPartyService, number> = {
   openweathermap: 800,   // 80% of 1,000/day
   perspective:    800,   // 80% of QPS limit converted to daily
   cloudinary:     200,   // 80% of ~250 uploads/day on free tier
+  huggingface:    800,   // 80% of ~1,000 req/day (free inference API)
 };
 
 // Alert threshold — email admin at this percentage (80% of soft limit)

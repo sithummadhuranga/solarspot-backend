@@ -51,7 +51,12 @@ const reviewSchema = new Schema<IReview & Document>(
 
 // ── Indexes ──────────────────────────────────────────────────────────────────
 // One review per user per station — database-level guarantee
-reviewSchema.index({ station: 1, author: 1 }, { unique: true });
+// Partial unique index: only one *active* review per user per station.
+// Soft-deleted reviews (isActive: false) are excluded, allowing re-submission after deletion.
+reviewSchema.index(
+  { station: 1, author: 1 },
+  { unique: true, partialFilterExpression: { isActive: true } },
+);
 reviewSchema.index({ station: 1, moderationStatus: 1 });
 
 // ── Post-save hook — recalculate station.averageRating + reviewCount ─────────

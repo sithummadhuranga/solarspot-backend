@@ -9,7 +9,8 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { protect }         from '@middleware/auth.middleware';
-import { checkPermission } from '@middleware/rbac.middleware';
+import { checkPermission, loadResource } from '@middleware/rbac.middleware';
+import { Review }          from './review.model';
 import { validate }        from '@middleware/validate.middleware';
 import * as ReviewController from './review.controller';
 import * as V                from './review.validation';
@@ -256,6 +257,7 @@ router.post('/',
  */
 router.put('/:id',
   protect,
+  loadResource(Review),
   checkPermission('reviews.edit-own'),
   validate(V.updateReviewSchema),
   ReviewController.updateReview,
@@ -292,6 +294,7 @@ router.put('/:id',
  */
 router.delete('/:id',
   protect,
+  loadResource(Review),
   checkPermission('reviews.delete-own'),
   ReviewController.deleteReview,
 );
@@ -326,6 +329,7 @@ router.delete('/:id',
  */
 router.post('/:id/helpful',
   protect,
+  loadResource(Review),
   checkPermission('reviews.helpful'),
   ReviewController.toggleHelpful,
 );

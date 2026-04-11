@@ -61,7 +61,8 @@ export type ThirdPartyService =
   | 'perspective'
   | 'nominatim'
   | 'cloudinary'
-  | 'brevo';
+  | 'brevo'
+  | 'huggingface';
 
 // ─── Geocoordinates ─────────────────────────────────────────────────────────
 export interface GeoPoint {
