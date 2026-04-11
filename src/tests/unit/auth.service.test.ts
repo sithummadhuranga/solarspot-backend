@@ -16,6 +16,7 @@ jest.mock('@config/env', () => ({
     JWT_REFRESH_EXPIRES: '7d',
     COOKIE_SECRET:       'test-cookie-secret-min-32-chars!!',
     APP_URL:             'http://localhost:5173',
+    FRONTEND_URL:        'http://localhost:5173',
     APP_NAME:            'SolarSpot',
     NODE_ENV:            'test',
     EMAIL_PREVIEW:       true,
@@ -60,9 +61,11 @@ import AuthService from '@modules/auth/auth.service';
 import { User }    from '@modules/users/user.model';
 import { Role }    from '@modules/permissions/role.model';
 import ApiError    from '@utils/ApiError';
+import { container } from '@/container';
 
 const mockUser = User as jest.Mocked<typeof User>;
 const mockRole = Role as jest.Mocked<typeof Role>;
+const mockEmailService = container.emailService as jest.Mocked<typeof container.emailService>;
 
 const FAKE_ROLE_ID  = new Types.ObjectId();
 const FAKE_USER_ID  = new Types.ObjectId();
@@ -104,6 +107,10 @@ describe('AuthService.register', () => {
 
     expect(result.message).toMatch(/check your email/i);
     expect(mockUser.create).toHaveBeenCalledTimes(1);
+    expect(mockEmailService.sendVerifyEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@example.com' }),
+      expect.stringMatching(/^http:\/\/localhost:5173\/verify-email\//),
+    );
   });
 
   it('should throw 409 if email already registered', async () => {
@@ -268,6 +275,10 @@ describe('AuthService.forgotPassword', () => {
   it('should send reset email when user exists', async () => {
     (mockUser.findOne as jest.Mock).mockResolvedValue({ ...fakeUser, save: jest.fn().mockResolvedValue(undefined) } as never);
     await expect(AuthService.forgotPassword('test@example.com')).resolves.toBeUndefined();
+    expect(mockEmailService.sendPasswordReset).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'test@example.com' }),
+      expect.stringMatching(/^http:\/\/localhost:5173\/reset-password\//),
+    );
   });
 
   it('should silently succeed when email not found (no enumeration)', async () => {
