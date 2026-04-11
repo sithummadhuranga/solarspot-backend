@@ -33,6 +33,9 @@ router.delete('/admin/roles/:id/permissions/:permId',
   protect, checkPermission('permissions.manage'), PC.removePermissionFromRole);
 
 // ─── User overrides ───────────────────────────────────────────────────────────
+router.get('/admin/users/:id/permissions/matrix',
+  protect, checkPermission('permissions.read'), PC.getUserPermissionMatrix);
+
 router.get('/admin/users/:id/permissions',
   protect, checkPermission('permissions.read'), PC.getUserEffectivePermissions);
 

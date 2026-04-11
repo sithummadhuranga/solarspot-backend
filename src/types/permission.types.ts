@@ -81,6 +81,16 @@ export interface IUserPermissionOverride extends Document {
   expiresAt?: Date;
 }
 
+export interface IUserPermissionMatrixItem {
+  permission: IPermission;
+  allowed: boolean;
+  roleGranted: boolean;
+  source: 'role' | 'override-grant' | 'override-deny' | 'none';
+  overrideEffect: 'grant' | 'deny' | null;
+  overrideReason?: string | null;
+  overrideExpiresAt?: Date | null;
+}
+
 // ─── Audit log document ─────────────────────────────────────────────────────
 export interface IAuditLog extends Document {
   _id: Types.ObjectId;

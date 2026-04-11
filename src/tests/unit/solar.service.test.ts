@@ -12,6 +12,8 @@
  *   - getBestChargingWindows (pure function — 4 tests)
  *   - solarService.createReport (5 tests)
  *   - solarService.updateReport (3 tests)
+ *   - solarService.publishReport / archiveReport elevated-role paths
+ *   - solarService.getReports elevated visibility
  *   - solarService.getStationAnalytics (2 tests)
  *
  * Owner: Member 3 · Ref: SolarIntelligence_Module_Prompt.md → A7
@@ -366,7 +368,8 @@ describe('solarService.updateReport', () => {
       FAKE_REPORT_ID.toString(),
       { notes: 'admin edit' },
       otherUserId,
-      'admin',
+      new Types.ObjectId().toString(),
+      4,
     );
 
     expect(doc.notes).toBe('admin edit');
@@ -388,6 +391,108 @@ describe('solarService.updateReport', () => {
     // confirm the doc's actualOutputKw was mutated (pre-save hook handles accuracyPct in real schema)
     expect(doc.actualOutputKw).toBe(3.6);
     expect(doc.save).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// solarService.publishReport / archiveReport
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('solarService.publishReport', () => {
+  const sessionDocQuery = <T>(value: T) => ({
+    session: jest.fn().mockResolvedValue(value),
+  });
+
+  it('allows a moderation-level viewer to restore an archived report using roleLevel', async () => {
+    const doc = {
+      _id: FAKE_REPORT_ID,
+      submittedBy: FAKE_USER_ID,
+      status: 'archived' as const,
+      isActive: true,
+      accuracyPct: null,
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockReport.findOne.mockReturnValue(sessionDocQuery(doc) as never);
+
+    const result = await solarService.publishReport(
+      FAKE_REPORT_ID.toString(),
+      new Types.ObjectId().toString(),
+      new Types.ObjectId().toString(),
+      3,
+    );
+
+    expect(doc.status).toBe('published');
+    expect(doc.save).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe('published');
+  });
+});
+
+describe('solarService.archiveReport', () => {
+  const sessionDocQuery = <T>(value: T) => ({
+    session: jest.fn().mockResolvedValue(value),
+  });
+
+  it('allows a moderation-level viewer to archive a report using roleLevel', async () => {
+    const doc = {
+      _id: FAKE_REPORT_ID,
+      submittedBy: FAKE_USER_ID,
+      status: 'published' as const,
+      isActive: true,
+      accuracyPct: null,
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockReport.findOne.mockReturnValue(sessionDocQuery(doc) as never);
+
+    const result = await solarService.archiveReport(
+      FAKE_REPORT_ID.toString(),
+      new Types.ObjectId().toString(),
+      new Types.ObjectId().toString(),
+      3,
+    );
+
+    expect(doc.status).toBe('archived');
+    expect(doc.save).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe('archived');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// solarService.getReports
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('solarService.getReports', () => {
+  it('returns all report statuses to elevated viewers using roleLevel even with opaque role ids', async () => {
+    const queryChain = {
+      sort: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      populate: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([
+        {
+          _id: FAKE_REPORT_ID,
+          submittedBy: new Types.ObjectId(),
+          status: 'archived',
+          isPublic: false,
+          isActive: true,
+          accuracyPct: null,
+        },
+      ]),
+    };
+
+    mockReport.find.mockReturnValue(queryChain as never);
+    mockReport.countDocuments.mockResolvedValue(1 as never);
+
+    const result = await solarService.getReports({}, {
+      _id: new Types.ObjectId().toString(),
+      role: new Types.ObjectId().toString(),
+      roleLevel: 3,
+    });
+
+    expect(mockReport.find).toHaveBeenCalledWith({ isActive: true });
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]?.status).toBe('archived');
   });
 });
 

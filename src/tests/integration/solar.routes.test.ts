@@ -42,6 +42,7 @@ jest.mock('@modules/solar/solar.service', () => ({
     updateReport:         jest.fn(),
     deleteReport:         jest.fn(),
     publishReport:        jest.fn(),
+    archiveReport:        jest.fn(),
   },
 }));
 
@@ -121,7 +122,7 @@ const fakePaginatedReports = {
 
 // ── Shared tokens ─────────────────────────────────────────────────────────────
 
-let _adminToken:  string;
+let adminToken:   string;
 let regularToken: string;
 let userId:       string;
 
@@ -161,7 +162,7 @@ beforeAll(async () => {
 
   userId = (regularUser._id as Types.ObjectId).toString();
 
-  _adminToken = jwt.sign(
+  adminToken = jwt.sign(
     {
       _id:             (adminUser._id as Types.ObjectId).toString(),
       email:           adminUser.email,
@@ -205,6 +206,7 @@ beforeEach(() => {
   mockSvc.updateReport.mockResolvedValue(fakeReport as never);
   mockSvc.deleteReport.mockResolvedValue(undefined);
   mockSvc.publishReport.mockResolvedValue({ ...fakeReport, status: 'published' } as never);
+  mockSvc.archiveReport.mockResolvedValue({ ...fakeReport, status: 'archived' } as never);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -460,5 +462,36 @@ describe('PATCH /api/solar/reports/:id/publish', () => {
       .set('Authorization', `Bearer ${regularToken}`);
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PATCH /api/solar/reports/:id/archive  — AUTH REQUIRED
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('PATCH /api/solar/reports/:id/archive', () => {
+  it('200 — archives a report for an admin-level caller', async () => {
+    const res = await request(app)
+      .patch(`/api/solar/reports/${REPORT_ID}/archive`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('archived');
+    expect(mockSvc.archiveReport).toHaveBeenCalledTimes(1);
+  });
+
+  it('401 — rejects unauthenticated archive attempts', async () => {
+    const res = await request(app).patch(`/api/solar/reports/${REPORT_ID}/archive`);
+    expect(res.status).toBe(401);
+    expect(mockSvc.archiveReport).not.toHaveBeenCalled();
+  });
+
+  it('403 — blocks regular users before the service layer', async () => {
+    const res = await request(app)
+      .patch(`/api/solar/reports/${REPORT_ID}/archive`)
+      .set('Authorization', `Bearer ${regularToken}`);
+
+    expect(res.status).toBe(403);
+    expect(mockSvc.archiveReport).not.toHaveBeenCalled();
   });
 });

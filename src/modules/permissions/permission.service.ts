@@ -12,6 +12,7 @@ import type {
   IRole,
   IRolePermission,
   IUserPermissionOverride,
+  IUserPermissionMatrixItem,
   IAuditLog,
   EvaluationResult,
   PaginationResult,
@@ -24,6 +25,38 @@ import { AuditLog }              from './audit_log.model';
 import { User }                  from '@modules/users/user.model';
 import { container }             from '@/container';
 import ApiError                  from '@utils/ApiError';
+
+const TRANSACTION_UNSUPPORTED_MESSAGE = 'Transaction numbers are only allowed on a replica set member or mongos';
+
+function isTransactionUnsupportedError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(TRANSACTION_UNSUPPORTED_MESSAGE);
+}
+
+async function runWithTransactionFallback<T>(
+  operation: (session: mongoose.ClientSession | null) => Promise<T>,
+): Promise<T> {
+  const session = await mongoose.startSession();
+
+  try {
+    try {
+      let result!: T;
+      await session.withTransaction(async () => {
+        result = await operation(session);
+      });
+      return result;
+    } catch (error) {
+      // Local standalone Mongo instances reject transactions. Retry the same write path
+      // without a session so admin tooling still works in development.
+      if (!isTransactionUnsupportedError(error)) {
+        throw error;
+      }
+
+      return operation(null);
+    }
+  } finally {
+    await session.endSession();
+  }
+}
 
 class PermissionService {
   // ─── Permissions catalog ────────────────────────────────────────────────
@@ -57,20 +90,29 @@ class PermissionService {
     if (!role)       throw ApiError.notFound('Role not found');
     if (!permission) throw ApiError.notFound('Permission not found');
 
-    const session = await mongoose.startSession();
-    let result!: IRolePermission;
-    await session.withTransaction(async () => {
-      const existing = await RolePermission.findOne({ role: roleId, permission: permissionId }).session(session);
+    const result = await runWithTransactionFallback(async (session) => {
+      const existingQuery = RolePermission.findOne({ role: roleId, permission: permissionId });
+      const existing = session
+        ? await existingQuery.session(session)
+        : await existingQuery;
+
       if (existing) {
         existing.set({ policies: policyIds });
-        await existing.save({ session });
-        result = existing as unknown as IRolePermission;
-      } else {
-        const [doc] = await RolePermission.create([{ role: roleId, permission: permissionId, policies: policyIds }], { session });
-        result = doc as unknown as IRolePermission;
+        if (session) {
+          await existing.save({ session });
+        } else {
+          await existing.save();
+        }
+
+        return existing as unknown as IRolePermission;
       }
+
+      const [doc] = session
+        ? await RolePermission.create([{ role: roleId, permission: permissionId, policies: policyIds }], { session })
+        : await RolePermission.create([{ role: roleId, permission: permissionId, policies: policyIds }]);
+
+      return doc as unknown as IRolePermission;
     });
-    await session.endSession();
 
     container.permissionEngine.flush(); // flush entire cache — role structure changed
     return result;
@@ -81,11 +123,15 @@ class PermissionService {
     const rp = await RolePermission.findOne({ role: roleId, permission: permissionId });
     if (!rp) throw ApiError.notFound('Role-permission assignment not found');
 
-    const session = await mongoose.startSession();
-    await session.withTransaction(async () => {
-      await RolePermission.deleteOne({ _id: rp._id }).session(session);
+    await runWithTransactionFallback(async (session) => {
+      const deleteQuery = RolePermission.deleteOne({ _id: rp._id });
+      if (session) {
+        await deleteQuery.session(session);
+        return;
+      }
+
+      await deleteQuery;
     });
-    await session.endSession();
 
     container.permissionEngine.flush();
   }
@@ -119,6 +165,68 @@ class PermissionService {
     return Array.from(result.values());
   }
 
+  /** GET /admin/users/:id/permissions/matrix */
+  async getUserPermissionMatrix(userId: string): Promise<IUserPermissionMatrixItem[]> {
+    const user = await User.findById(userId).populate<{ role: IRole }>('role').lean();
+    if (!user) throw ApiError.notFound('User not found');
+
+    const [permissions, rolePerms, overrides] = await Promise.all([
+      Permission.find().sort({ component: 1, action: 1 }).lean() as unknown as Promise<IPermission[]>,
+      RolePermission.find({ role: (user.role as IRole)._id }).select('permission').lean() as unknown as Promise<Array<{ permission: import('mongoose').Types.ObjectId }>>,
+      UserPermissionOverride.find({
+        user: userId,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+      })
+        .populate<{ permission: IPermission }>('permission')
+        .lean() as unknown as Promise<Array<IUserPermissionOverride & { permission: IPermission }>>,
+    ]);
+
+    const roleGrantedIds = new Set(rolePerms.map((entry) => entry.permission.toString()));
+    const overrideMap = new Map(
+      overrides.map((override) => [override.permission._id.toString(), override] as const),
+    );
+
+    return permissions.map((permission) => {
+      const permissionId = permission._id.toString();
+      const roleGranted = roleGrantedIds.has(permissionId);
+      const override = overrideMap.get(permissionId);
+
+      if (override?.effect === 'grant') {
+        return {
+          permission,
+          allowed: true,
+          roleGranted,
+          source: 'override-grant',
+          overrideEffect: 'grant',
+          overrideReason: override.reason ?? null,
+          overrideExpiresAt: override.expiresAt ?? null,
+        } satisfies IUserPermissionMatrixItem;
+      }
+
+      if (override?.effect === 'deny') {
+        return {
+          permission,
+          allowed: false,
+          roleGranted,
+          source: 'override-deny',
+          overrideEffect: 'deny',
+          overrideReason: override.reason ?? null,
+          overrideExpiresAt: override.expiresAt ?? null,
+        } satisfies IUserPermissionMatrixItem;
+      }
+
+      return {
+        permission,
+        allowed: roleGranted,
+        roleGranted,
+        source: roleGranted ? 'role' : 'none',
+        overrideEffect: null,
+        overrideReason: null,
+        overrideExpiresAt: null,
+      } satisfies IUserPermissionMatrixItem;
+    });
+  }
+
   /** POST /admin/users/:id/permissions */
   async overrideUserPermission(
     userId: string,
@@ -135,26 +243,35 @@ class PermissionService {
     if (!targetUser) throw ApiError.notFound('User not found');
     if (!permission) throw ApiError.notFound('Permission not found');
 
-    const session = await mongoose.startSession();
-    let override!: IUserPermissionOverride;
-    await session.withTransaction(async () => {
+    const override = await runWithTransactionFallback(async (session) => {
       const doc = await UserPermissionOverride.findOneAndUpdate(
         { user: userId, permission: permissionId },
         { $set: { effect, reason, grantedBy: grantedById, expiresAt: expiresAt ?? null } },
-        { upsert: true, returnDocument: 'after', session },
+        {
+          upsert: true,
+          returnDocument: 'after',
+          ...(session ? { session } : {}),
+        },
       );
-      override = doc as unknown as IUserPermissionOverride;
+      const nextOverride = doc as unknown as IUserPermissionOverride;
 
-      await AuditLog.create([{
+      const auditEntry = [{
         actor:      grantedById,
         action:     `permission.override.${effect}`,
         resource:   'user_permission_override',
-        resourceId: override._id,
+        resourceId: nextOverride._id,
         after:      { userId, permissionId, effect, reason, expiresAt },
         ip:         undefined,
-      }], { session });
+      }];
+
+      if (session) {
+        await AuditLog.create(auditEntry, { session });
+      } else {
+        await AuditLog.create(auditEntry);
+      }
+
+      return nextOverride;
     });
-    await session.endSession();
 
     container.permissionEngine.flush(userId);
     return override;
@@ -165,18 +282,29 @@ class PermissionService {
     const override = await UserPermissionOverride.findOne({ user: userId, permission: permissionId });
     if (!override) throw ApiError.notFound('Permission override not found');
 
-    const session = await mongoose.startSession();
-    await session.withTransaction(async () => {
-      await UserPermissionOverride.deleteOne({ _id: override._id }).session(session);
-      await AuditLog.create([{
+    await runWithTransactionFallback(async (session) => {
+      const deleteQuery = UserPermissionOverride.deleteOne({ _id: override._id });
+      if (session) {
+        await deleteQuery.session(session);
+      } else {
+        await deleteQuery;
+      }
+
+      const auditEntry = [{
         actor:      actorId,
         action:     'permission.override.removed',
         resource:   'user_permission_override',
         resourceId: override._id,
         before:     { userId, permissionId, effect: override.effect },
-      }], { session });
+      }];
+
+      if (session) {
+        await AuditLog.create(auditEntry, { session });
+        return;
+      }
+
+      await AuditLog.create(auditEntry);
     });
-    await session.endSession();
 
     container.permissionEngine.flush(userId);
   }
