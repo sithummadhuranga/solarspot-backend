@@ -18,6 +18,11 @@ export const config = {
   // ── Database ─────────────────────────────────────────────
   MONGODB_URI: process.env.MONGODB_URI as string,           // REQUIRED
   MONGODB_DB_NAME: process.env.MONGODB_DB_NAME ?? 'solarspot',
+  RUN_SEED: process.env.RUN_SEED ?? '',
+
+  // ── Bootstrap / seeding ──────────────────────────────────
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL ?? '',
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD ?? '',
 
   // ── Auth / JWT ────────────────────────────────────────────
   JWT_SECRET: process.env.JWT_SECRET as string,                    // REQUIRED — min 64 chars

@@ -78,9 +78,54 @@ for (const origin of corsOrigins) {
 import app from './app';
 import http from 'http';
 import { runSeedersOnExistingConnection, SeedMode } from './src/seed/runner';
+import { SystemMeta } from '@modules/permissions/system_meta.model';
 
 const PORT = parseInt(config.PORT, 10);
 const server = http.createServer(app);
+
+function hasBootstrapAdminCredentials(): boolean {
+  return Boolean(config.ADMIN_EMAIL.trim() && config.ADMIN_PASSWORD.trim());
+}
+
+async function ensureSeededState(): Promise<void> {
+  const runSeedMode = config.RUN_SEED as SeedMode | '';
+
+  if (runSeedMode) {
+    const validModes: SeedMode[] = ['full', 'core', 'demo', 'production', 'verify'];
+    if (!validModes.includes(runSeedMode)) {
+      logger.error(`RUN_SEED has invalid value "${runSeedMode}". Valid: ${validModes.join(', ')}`);
+      process.exit(1);
+    }
+    logger.info(`RUN_SEED=${runSeedMode} detected — running seed before server start`);
+    await runSeedersOnExistingConnection(runSeedMode);
+    logger.info('Seed completed — server will now start. Remove RUN_SEED env var to skip on next deploy.');
+    return;
+  }
+
+  const systemMeta = await SystemMeta.findOne().select('_id').lean();
+  if (systemMeta) {
+    return;
+  }
+
+  if (config.NODE_ENV === 'production') {
+    if (!hasBootstrapAdminCredentials()) {
+      logger.error(
+        'Production database is empty and bootstrap credentials are missing. ' +
+        'Set ADMIN_EMAIL and ADMIN_PASSWORD, or deploy once with RUN_SEED=production.',
+      );
+      process.exit(1);
+    }
+
+    logger.warn('No seed metadata found in production database — running initial production bootstrap seed.');
+    await runSeedersOnExistingConnection('production');
+    logger.info('Initial production bootstrap seed completed.');
+    return;
+  }
+
+  logger.warn(
+    'Database seed metadata not found. Run npm run seed:core, npm run seed:production, or set RUN_SEED for one startup bootstrap.',
+  );
+}
 
 // ─── Graceful shutdown helper ──────────────────────────────────────────────────
 function gracefulShutdown(signal: string): void {
@@ -123,21 +168,7 @@ process.on('SIGINT',  () => gracefulShutdown('SIGINT'));  // Ctrl-C
 (async () => {
   try {
     await connectDB();
-
-    // ─── On-startup seed (for Render free tier — no shell access) ────────────
-    // Set RUN_SEED=production (or core/full/demo) in Render env vars to trigger.
-    // Remove the env var after the first successful deploy to avoid re-seeding.
-    const runSeedMode = process.env.RUN_SEED as SeedMode | undefined;
-    if (runSeedMode) {
-      const validModes: SeedMode[] = ['full', 'core', 'demo', 'production', 'verify'];
-      if (!validModes.includes(runSeedMode)) {
-        logger.error(`RUN_SEED has invalid value "${runSeedMode}". Valid: ${validModes.join(', ')}`);
-        process.exit(1);
-      }
-      logger.info(`RUN_SEED=${runSeedMode} detected — running seed before server start`);
-      await runSeedersOnExistingConnection(runSeedMode);
-      logger.info('Seed completed — server will now start. Remove RUN_SEED env var to skip on next deploy.');
-    }
+    await ensureSeededState();
 
     server.listen(PORT, () => {
       logger.info('─────────────────────────────────────────────');
