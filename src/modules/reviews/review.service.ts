@@ -43,6 +43,29 @@ const TOXICITY_PENDING_THRESHOLD = 0.60;
  */
 const FLAG_AUTO_ESCALATE_THRESHOLD = 3;
 
+type DuplicateKeyError = Error & {
+  code?: number;
+  keyPattern?: Record<string, unknown>;
+};
+
+function isDuplicateKeyError(error: unknown): error is DuplicateKeyError {
+  return typeof error === 'object' && error !== null && 'code' in error
+    && (error as { code?: unknown }).code === 11000;
+}
+
+function isReviewDuplicateKeyError(error: unknown): boolean {
+  if (!isDuplicateKeyError(error)) {
+    return false;
+  }
+
+  const keyPattern = error.keyPattern;
+  if (!keyPattern || Object.keys(keyPattern).length === 0) {
+    return true;
+  }
+
+  return 'station' in keyPattern && 'author' in keyPattern;
+}
+
 // ── Sort mapping ─────────────────────────────────────────────────────────────
 function buildSort(sort: string): Record<string, 1 | -1> {
   switch (sort) {
@@ -337,18 +360,26 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
     }
   }
 
-  const review = await Review.create({
-    station:          new Types.ObjectId(stationId),
-    author:           new Types.ObjectId(authorId),
-    rating,
-    title:            title?.trim() || undefined,
-    content,
-    moderationStatus,
-    ...(toxicityScore !== null && { toxicityScore }),
-    // If the review is auto-rejected by moderation, keep it stored but mark
-    // it inactive so it doesn't block re-submission by the same author.
-    isActive: moderationStatus !== 'rejected',
-  });
+  let review: IReview;
+  try {
+    review = await Review.create({
+      station:          new Types.ObjectId(stationId),
+      author:           new Types.ObjectId(authorId),
+      rating,
+      title:            title?.trim() || undefined,
+      content,
+      moderationStatus,
+      ...(toxicityScore !== null && { toxicityScore }),
+      // If the review is auto-rejected by moderation, keep it stored but mark
+      // it inactive so it doesn't block re-submission by the same author.
+      isActive: moderationStatus !== 'rejected',
+    });
+  } catch (error) {
+    if (isReviewDuplicateKeyError(error)) {
+      throw ApiError.conflict('You have already reviewed this station. Edit or delete your existing review before posting a new one.');
+    }
+    throw error;
+  }
 
   logger.info(`[reviews] Created review ${review._id} for station ${stationId} by user ${authorId} (toxicity: ${toxicityScore ?? 'skipped'}, status: ${moderationStatus})`);
   return review;
