@@ -4,16 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Verify your email — {{APP_NAME}}</title>
-  <!--
-    TODO: Member 4 — style this template.
-    Variables: {{APP_NAME}}, {{USER_NAME}}, {{VERIFY_URL}}, {{APP_URL}}
-  -->
 </head>
-<body>
-  <p>Hi {{USER_NAME}},</p>
-  <p>Please verify your email address by clicking the link below:</p>
-  <p><a href="{{VERIFY_URL}}">Verify Email</a></p>
-  <p>This link expires in 24 hours.</p>
-  <p>— The {{APP_NAME}} Team</p>
+<body style="margin:0; padding:0; background-color:#f3f7f1; font-family:Arial, Helvetica, sans-serif; color:#173226;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f3f7f1; margin:0; padding:24px 0; width:100%;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:620px; background-color:#ffffff; border:1px solid #dbe8d8; border-radius:24px; overflow:hidden;">
+          <tr>
+            <td style="padding:32px 36px; background:linear-gradient(135deg, #0f766e 0%, #65a30d 100%); color:#ffffff;">
+              <div style="font-size:12px; letter-spacing:0.18em; text-transform:uppercase; font-weight:700; opacity:0.9;">{{APP_NAME}}</div>
+              <h1 style="margin:14px 0 10px; font-size:32px; line-height:1.2; font-weight:700; color:#ffffff;">Verify your email</h1>
+              <p style="margin:0; font-size:16px; line-height:1.6; color:#e8fff5;">One quick confirmation and your account is ready to submit stations, write reviews, and unlock personalized solar insights.</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:36px;">
+              <p style="margin:0 0 16px; font-size:16px; line-height:1.7; color:#173226;">Hi {{USER_NAME}},</p>
+              <p style="margin:0 0 24px; font-size:16px; line-height:1.7; color:#355247;">Thanks for creating your {{APP_NAME}} account. Use the button below to verify your email address. This link expires in 24 hours.</p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+                <tr>
+                  <td align="center" bgcolor="#15803d" style="border-radius:999px;">
+                    <a href="{{VERIFY_URL}}" style="display:inline-block; padding:15px 28px; font-size:15px; font-weight:700; line-height:1; color:#ffffff; text-decoration:none;">Verify email</a>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 24px; background-color:#f8fbf6; border:1px solid #e1ebde; border-radius:18px;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 8px; font-size:14px; line-height:1.6; font-weight:700; color:#173226;">Why this matters</p>
+                    <p style="margin:0; font-size:14px; line-height:1.7; color:#537064;">Email verification protects your account and helps keep station submissions and community reviews tied to real users.</p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 10px; font-size:14px; line-height:1.7; color:#537064;">If the button does not work, copy and paste this link into your browser:</p>
+              <p style="margin:0; font-size:14px; line-height:1.7; word-break:break-all;"><a href="{{VERIFY_URL}}" style="color:#0f766e; text-decoration:underline;">{{VERIFY_URL}}</a></p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 36px; border-top:1px solid #e6eee3; background-color:#fafcf9;">
+              <p style="margin:0 0 8px; font-size:13px; line-height:1.7; color:#5d7368;">If you did not create a {{APP_NAME}} account, you can safely ignore this email.</p>
+              <p style="margin:0; font-size:13px; line-height:1.7; color:#5d7368;">Open <a href="{{APP_URL}}" style="color:#0f766e; text-decoration:none; font-weight:700;">{{APP_NAME}}</a></p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
