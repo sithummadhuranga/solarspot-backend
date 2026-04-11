@@ -14,6 +14,7 @@
 
 import bcrypt from 'bcryptjs';
 import { ClientSession } from 'mongoose';
+import { config } from '@config/env';
 import { User } from '@modules/users/user.model';
 import { Role } from '@modules/permissions/role.model';
 import logger from '@utils/logger';
@@ -21,8 +22,8 @@ import logger from '@utils/logger';
 const SALT_ROUNDS = 12;
 
 export async function seedProductionAdmin(session: ClientSession): Promise<void> {
-  const email    = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD?.trim();
+  const email = config.ADMIN_EMAIL.trim().toLowerCase();
+  const password = config.ADMIN_PASSWORD.trim();
 
   if (!email || !password) {
     throw new Error(
