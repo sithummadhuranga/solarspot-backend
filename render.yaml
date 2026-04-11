@@ -48,7 +48,7 @@ services:
 
       # ── Database (set in dashboard) ─────────────────────────────────────────
       - key: MONGODB_URI
-        sync: false          # full Atlas URI, e.g. mongodb+srv://user:pass@cluster0.abcde.mongodb.net/solarspot?retryWrites=true&w=majority
+        sync: false          # full Atlas URI including the database path, e.g. mongodb+srv://user:pass@cluster0.abcde.mongodb.net/solarspot?retryWrites=true&w=majority
 
       # ── JWT (auto-generated — copy values to the frontend env if needed) ────
       # ── App identity ─────────────────────────────────────────────────────────

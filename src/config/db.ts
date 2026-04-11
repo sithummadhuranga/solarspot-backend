@@ -58,8 +58,10 @@ export async function connectDB(): Promise<void> {
   }
 
   try {
-    const conn = await mongoose.connect(uri);
-    logger.info(`MongoDB connected: ${conn.connection.host}`);
+    const conn = await mongoose.connect(uri, {
+      dbName: config.MONGODB_DB_NAME,
+    });
+    logger.info(`MongoDB connected: ${conn.connection.host}/${conn.connection.name}`);
   } catch (error) {
     const networkError = error as NodeJS.ErrnoException & { hostname?: string };
 
