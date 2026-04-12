@@ -3,9 +3,9 @@ import type { Config } from 'jest';
 const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/tests/unit*.test.ts'],
+  testMatch: ['**/tests/unit/**/*.test.ts'],
   collectCoverageFrom: [
-    'src*.ts',
+    'src/**/*.ts',
     '!src/tests/**',
     '!src/config/swagger.ts',
     '!src/templates/**',
