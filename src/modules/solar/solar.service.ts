@@ -396,18 +396,16 @@ export async function getReports(
     filter['visitedAt'] = range;
   }
 
-  if (canModerateSolarReports(viewer)) {
-    void 0;
-  } else if (viewer?._id && requestedUserId === viewer._id) {
-    void 0;
-  } else if (viewer?._id) {
-    filter['$or'] = [
-      { status: 'published', isPublic: true },
-      { submittedBy: new Types.ObjectId(viewer._id) },
-    ];
-  } else {
-    filter['status'] = 'published';
-    filter['isPublic'] = true;
+  if (!canModerateSolarReports(viewer) && !(viewer?._id && requestedUserId === viewer._id)) {
+    if (viewer?._id) {
+      filter['$or'] = [
+        { status: 'published', isPublic: true },
+        { submittedBy: new Types.ObjectId(viewer._id) },
+      ];
+    } else {
+      filter['status'] = 'published';
+      filter['isPublic'] = true;
+    }
   }
 
   const sortMap: Record<string, Record<string, 1 | -1>> = {
