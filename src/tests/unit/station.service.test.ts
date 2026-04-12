@@ -1,10 +1,22 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import * as stationService from '@modules/stations/station.service';
 import { Station } from '@modules/stations/station.model';
+import { User } from '@modules/users/user.model';
+import { AuditLog } from '@modules/permissions/audit_log.model';
 import * as geocoder from '@utils/geocoder';
 
 
-jest.mock('@modules/users/user.model', () => ({}));
+jest.mock('@modules/users/user.model', () => ({
+  User: {
+    findById: jest.fn(),
+  },
+}));
+
+jest.mock('@modules/permissions/audit_log.model', () => ({
+  AuditLog: {
+    create: jest.fn(),
+  },
+}));
 
 jest.mock('@modules/stations/station.model', () => ({
   Station: {
@@ -99,6 +111,21 @@ function makeChain(resolvedValue: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+
+  const session = {
+    startTransaction: jest.fn(),
+    commitTransaction: jest.fn().mockResolvedValue(undefined),
+    abortTransaction: jest.fn().mockResolvedValue(undefined),
+    endSession: jest.fn().mockResolvedValue(undefined),
+  };
+  jest.spyOn(mongoose, 'startSession').mockResolvedValue(session as never);
+
+  (AuditLog.create as jest.Mock).mockResolvedValue(undefined);
+  (User.findById as jest.Mock).mockReturnValue({
+    select: jest.fn().mockReturnValue({
+      lean: jest.fn().mockResolvedValue(null),
+    }),
+  });
 });
 
 describe('createStation', () => {
@@ -425,7 +452,9 @@ describe('listStations', () => {
 describe('approveStation', () => {
   it('sets status to active, isVerified:true, records verifiedBy and verifiedAt', async () => {
     const stationDoc = makeMockStation({ status: 'pending' });
-    (Station.findOne as jest.Mock).mockResolvedValue(stationDoc);
+    (Station.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockResolvedValue(stationDoc),
+    });
 
     await stationService.approveStation(STATION_ID, MOD_ID);
 
@@ -439,7 +468,9 @@ describe('approveStation', () => {
 
   it('throws 400 when station status is not pending', async () => {
     const stationDoc = makeMockStation({ status: 'active' });
-    (Station.findOne as jest.Mock).mockResolvedValue(stationDoc);
+    (Station.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockResolvedValue(stationDoc),
+    });
 
     await expect(
       stationService.approveStation(STATION_ID, MOD_ID)
@@ -450,7 +481,9 @@ describe('approveStation', () => {
 
   it('throws 400 for a rejected station', async () => {
     const stationDoc = makeMockStation({ status: 'rejected' });
-    (Station.findOne as jest.Mock).mockResolvedValue(stationDoc);
+    (Station.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockResolvedValue(stationDoc),
+    });
 
     await expect(
       stationService.approveStation(STATION_ID, MOD_ID)
@@ -464,7 +497,9 @@ describe('approveStation', () => {
   });
 
   it('throws 404 when station is not found', async () => {
-    (Station.findOne as jest.Mock).mockResolvedValue(null);
+    (Station.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockResolvedValue(null),
+    });
 
     await expect(
       stationService.approveStation(STATION_ID, MOD_ID)
@@ -476,7 +511,9 @@ describe('approveStation', () => {
 describe('rejectStation', () => {
   it('sets status to rejected and persists the rejectionReason', async () => {
     const stationDoc = makeMockStation({ status: 'pending' });
-    (Station.findOne as jest.Mock).mockResolvedValue(stationDoc);
+    (Station.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockResolvedValue(stationDoc),
+    });
 
     await stationService.rejectStation(STATION_ID, 'Insufficient solar panel information', MOD_ID);
 
@@ -487,7 +524,9 @@ describe('rejectStation', () => {
 
   it('throws 400 when station is not in pending status', async () => {
     const stationDoc = makeMockStation({ status: 'active' });
-    (Station.findOne as jest.Mock).mockResolvedValue(stationDoc);
+    (Station.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockResolvedValue(stationDoc),
+    });
 
     await expect(
       stationService.rejectStation(STATION_ID, 'Some reason', MOD_ID)

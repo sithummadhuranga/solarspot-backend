@@ -104,7 +104,7 @@ class PermissionService {
         : await existingQuery;
 
       if (existing) {
-        before = {
+        const before = {
           roleId,
           permissionId,
           policyIds: existing.policies.map((policyId) => policyId.toString()),
