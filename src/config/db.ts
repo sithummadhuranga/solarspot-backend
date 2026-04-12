@@ -36,10 +36,7 @@ function getMongoUriConfigError(uri: string): string | null {
   return null;
 }
 
-/**
- * Connects to MongoDB using the MONGODB_URI environment variable.
- * Exits the process with code 1 if the connection fails.
- */
+
 export async function connectDB(): Promise<void> {
   const uri = config.MONGODB_URI;
 

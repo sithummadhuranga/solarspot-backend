@@ -1,19 +1,11 @@
-/**
- * Review TypeScript interfaces.
- * Owner: Member 2
- * Ref: PROJECT_OVERVIEW.md → Database → reviews collection
- */
+
 
 import { Document, Types } from 'mongoose';
 
-// ─── Moderation status ──────────────────────────────────────────────────────
 export type ModerationStatus = 'approved' | 'pending' | 'rejected' | 'flagged';
 
-// ─── Sort options ───────────────────────────────────────────────────────────
 export type ReviewSortOption = 'newest' | 'oldest' | 'highest' | 'lowest' | 'helpful';
 
-// ─── Review document ────────────────────────────────────────────────────────
-// Compound unique index: { station, author }
 export interface IReview extends Document {
   _id: Types.ObjectId;
   station: Types.ObjectId;        // ref: 'Station'
@@ -38,7 +30,6 @@ export interface IReview extends Document {
   updatedAt: Date;
 }
 
-// ─── DTOs ───────────────────────────────────────────────────────────────────
 export interface CreateReviewInput {
   station: string;
   rating: number;

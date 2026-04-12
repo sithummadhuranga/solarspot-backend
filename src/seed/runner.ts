@@ -1,23 +1,4 @@
-/**
- * Seed runner — executes seeders in strict dependency order.
- *
- * Owner: Member 4 — implement after all models are in place.
- * Ref:  PROJECT_OVERVIEW.md → Seeder Commands
- *       PROJECT_OVERVIEW.md → Seeder order: 00 → 01 → 02 → 03 → 04 → 05 → 06 → 07
- *
- * Commands (add to package.json scripts):
- *   npm run seed          → runs 00–07 (full)
- *   npm run seed:core     → runs 00–04 (safe for production)
- *   npm run seed:demo     → runs 05–07 (demo data only)
- *   npm run seed:reset    → drop DB + full seed (dev only)
- *   npm run seed:verify   → validate seedManifestHash in system_meta
- *
- * ⚠️  The app will NOT start cleanly if seed:core has not been run.
- *     server.ts checks system_meta and warns with an actionable message.
- *
- * All seeder operations run inside a single MongoDB session transaction.
- * See MASTER_PROMPT.md → ACID → Atomicity.
- */
+
 
 import mongoose from 'mongoose';
 import { config } from '@config/env';
@@ -28,7 +9,6 @@ import { PERMISSIONS_SEED } from './01_permissions';
 import { POLICIES_SEED }    from './02_policies';
 import { ROLES_SEED }       from './03_roles';
 
-// Seeder imports
 import { seedSystemMeta }      from './00_system_meta';
 import { seedPermissions }     from './01_permissions';
 import { seedPolicies }        from './02_policies';
@@ -55,9 +35,6 @@ const DEMO_SEEDERS: SeederEntry[] = [
   { name: '07_demo_reviews',   fn: seedDemoReviews },
 ];
 
-// ⚠️  PRODUCTION ONLY — seeds core data + a single admin account from env vars.
-// Credentials are read from ADMIN_EMAIL and ADMIN_PASSWORD — never hardcoded.
-// Never includes demo users, stations, or reviews.
 const PRODUCTION_SEEDERS: SeederEntry[] = [
   ...CORE_SEEDERS,
   { name: 'prod_admin', fn: seedProductionAdmin },
@@ -65,10 +42,7 @@ const PRODUCTION_SEEDERS: SeederEntry[] = [
 
 export type SeedMode = 'full' | 'core' | 'demo' | 'production' | 'verify';
 
-/**
- * Run seeders using an already-open Mongoose connection.
- * Used by server.ts when the RUN_SEED env var is set (Render free tier has no shell).
- */
+
 export async function runSeedersOnExistingConnection(mode: SeedMode): Promise<void> {
   if (mode === 'verify') {
     const meta = await SystemMeta.findOne().lean();
@@ -164,8 +138,6 @@ async function run(mode: SeedMode = 'full'): Promise<void> {
     return;
   }
 
-  // Run all seeders — use a transaction when the server supports it (replica set / Atlas),
-  // otherwise fall back to sequential upserts without a session (standalone dev MongoDB).
   const session = await mongoose.startSession();
   let usedTransaction = false;
   try {
@@ -196,7 +168,6 @@ async function run(mode: SeedMode = 'full'): Promise<void> {
   logger.info(`Seed complete [mode: ${mode}] — ${seeders.length} seeders ran${usedTransaction ? ' (with transaction)' : ' (no-session fallback)'}`);
 }
 
-// CLI entry point — only runs when this file is executed directly (not when imported)
 if (require.main === module) {
   const mode = (process.argv[2] as SeedMode) ?? 'full';
   run(mode).catch((err) => {

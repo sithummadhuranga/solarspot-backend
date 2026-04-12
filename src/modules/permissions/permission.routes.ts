@@ -1,10 +1,4 @@
-/**
- * Permission routes — 12 admin endpoints + 1 self-service check endpoint.
- *
- * Middleware order (MASTER_PROMPT): protect → checkPermission → validate → controller
- *
- * Ref: PROJECT_OVERVIEW.md → API Endpoints → Permissions
- */
+
 
 import { Router }            from 'express';
 import { protect }           from '@middleware/auth.middleware';
@@ -15,11 +9,9 @@ import * as V                from './permission.validation';
 
 const router = Router();
 
-// ─── Permissions catalog ──────────────────────────────────────────────────────
 router.get('/admin/permissions',
   protect, checkPermission('permissions.read'), PC.listPermissions);
 
-// ─── Roles ────────────────────────────────────────────────────────────────────
 router.get('/admin/roles',
   protect, checkPermission('permissions.read'), PC.listRoles);
 
@@ -32,7 +24,6 @@ router.post('/admin/roles/:id/permissions',
 router.delete('/admin/roles/:id/permissions/:permId',
   protect, checkPermission('permissions.manage'), PC.removePermissionFromRole);
 
-// ─── User overrides ───────────────────────────────────────────────────────────
 router.get('/admin/users/:id/permissions/matrix',
   protect, checkPermission('permissions.read'), PC.getUserPermissionMatrix);
 
@@ -45,15 +36,12 @@ router.post('/admin/users/:id/permissions',
 router.delete('/admin/users/:id/permissions/:permId',
   protect, checkPermission('permissions.manage'), PC.removeUserPermissionOverride);
 
-// ─── Client-side permission gate ──────────────────────────────────────────────
 router.post('/check',
   protect, validate(V.checkPermSchema), PC.checkPermission);
 
-// ─── Audit logs ───────────────────────────────────────────────────────────────
 router.get('/admin/audit-logs',
   protect, checkPermission('audit.read'), PC.listAuditLogs);
 
-// ─── Quota stats ──────────────────────────────────────────────────────────────
 router.get('/admin/quota',
   protect, checkPermission('quotas.read'), PC.getQuotaStats);
 

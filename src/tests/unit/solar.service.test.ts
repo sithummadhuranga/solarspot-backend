@@ -1,27 +1,7 @@
-/**
- * Unit tests — Solar Intelligence module
- *
- * All external dependencies are mocked so this suite has zero I/O:
- *   - Station model          → mocked DB queries
- *   - SolarReport model      → mocked DB operations
- *   - solarWeatherService    → mocked OWM calls
- *   - logger                 → silenced
- *
- * Covers:
- *   - calculateSolarOutput (pure function — 5 tests)
- *   - getBestChargingWindows (pure function — 4 tests)
- *   - solarService.createReport (5 tests)
- *   - solarService.updateReport (3 tests)
- *   - solarService.publishReport / archiveReport elevated-role paths
- *   - solarService.getReports elevated visibility
- *   - solarService.getStationAnalytics (2 tests)
- *
- * Owner: Member 3 · Ref: SolarIntelligence_Module_Prompt.md → A7
- */
+
 
 import mongoose, { Types } from 'mongoose';
 
-// ── Mocks (must be hoisted before any imports) ────────────────────────────────
 
 jest.mock('@config/env', () => ({
   config: {
@@ -44,7 +24,6 @@ jest.mock('@modules/permissions/audit_log.model', () => ({
 }));
 
 jest.mock('@modules/solar/solar-report.model', () => {
-  // We need a constructor mock that also supports model static methods.
   const mockSave = jest.fn().mockResolvedValue(undefined);
   const MockSolarReport = jest.fn().mockImplementation((data: unknown) => ({
     ...(data as object),
@@ -68,7 +47,6 @@ jest.mock('@modules/solar/solar-weather.service', () => ({
   getBestChargingWindows:    jest.requireActual('@modules/solar/solar-weather.service').getBestChargingWindows,
 }));
 
-// ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { calculateSolarOutput, getBestChargingWindows } from '@modules/solar/solar-weather.service';
 import solarService from '@modules/solar/solar.service';
@@ -86,7 +64,6 @@ const mockSession = {
   endSession: jest.fn().mockResolvedValue(undefined),
 };
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const FAKE_STATION_ID = new Types.ObjectId();
 const FAKE_USER_ID    = new Types.ObjectId();
@@ -112,7 +89,6 @@ const fakeWeather = {
   isFallback:    false,
 };
 
-// ── beforeEach ────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -120,9 +96,6 @@ beforeEach(() => {
   mockAuditLog.create.mockResolvedValue([] as never);
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// calculateSolarOutput — pure function tests
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('weatherService.calculateSolarOutput', () => {
   it('returns 0 output when cloud cover is 100%', () => {
@@ -180,9 +153,6 @@ describe('weatherService.calculateSolarOutput', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// getBestChargingWindows — pure function tests
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('weatherService.getBestChargingWindows', () => {
   const makeSlot = (uvIndex: number, cloudCoverPct: number, offset: number) => ({
@@ -219,7 +189,6 @@ describe('weatherService.getBestChargingWindows', () => {
     ];
     const result = getBestChargingWindows(slots, 5);
     result.forEach((w) => {
-      // All returned windows should have a positive solar score (never 0 from night)
       expect(w.solarScore).toBeGreaterThan(0);
     });
   });
@@ -230,9 +199,6 @@ describe('weatherService.getBestChargingWindows', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// solarService.createReport
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('solarService.createReport', () => {
   const sessionLeanQuery = <T>(value: T) => ({
@@ -331,9 +297,6 @@ describe('solarService.createReport', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// solarService.updateReport
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('solarService.updateReport', () => {
   const otherUserId   = new Types.ObjectId().toString();
@@ -388,15 +351,11 @@ describe('solarService.updateReport', () => {
       'user',
     );
 
-    // confirm the doc's actualOutputKw was mutated (pre-save hook handles accuracyPct in real schema)
     expect(doc.actualOutputKw).toBe(3.6);
     expect(doc.save).toHaveBeenCalledTimes(1);
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// solarService.publishReport / archiveReport
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('solarService.publishReport', () => {
   const sessionDocQuery = <T>(value: T) => ({
@@ -458,9 +417,6 @@ describe('solarService.archiveReport', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// solarService.getReports
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('solarService.getReports', () => {
   it('returns all report statuses to elevated viewers using roleLevel even with opaque role ids', async () => {
@@ -496,9 +452,6 @@ describe('solarService.getReports', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// solarService.getStationAnalytics
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('solarService.getStationAnalytics', () => {
   it('returns hasData: false with zeroed values when no reports exist', async () => {

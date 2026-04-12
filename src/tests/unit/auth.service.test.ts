@@ -1,14 +1,8 @@
-/**
- * Unit tests — AuthService
- * All external deps (DB, Email, JWT) are mocked.
- * Ref: MASTER_PROMPT.md → Testing — Unit tests must mock all external deps
- */
+
 
 import { Types } from 'mongoose';
 
-// ─── Mock modules before importing AuthService ───────────────────────────────
 
-// config must be mocked first — it is evaluated at import time
 jest.mock('@config/env', () => ({
   config: {
     JWT_SECRET:          'test-jwt-secret-that-is-at-least-64-chars-long-for-compliance-xyz',
@@ -56,7 +50,6 @@ jest.mock('mongoose', () => {
   return { ...actual, startSession: jest.fn().mockResolvedValue(mockSession) };
 });
 
-// Import service AFTER mocks are in place
 import AuthService from '@modules/auth/auth.service';
 import { User }    from '@modules/users/user.model';
 import { Role }    from '@modules/permissions/role.model';
@@ -91,7 +84,6 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-// ─── register ───────────────────────────────────────────────────────────────
 
 describe('AuthService.register', () => {
   it('should create user and send verification email', async () => {
@@ -135,7 +127,6 @@ describe('AuthService.register', () => {
   });
 });
 
-// ─── login ───────────────────────────────────────────────────────────────────
 
 describe('AuthService.login', () => {
   const _userWithPassword = {
@@ -188,7 +179,6 @@ describe('AuthService.login', () => {
   });
 });
 
-// ─── logout ──────────────────────────────────────────────────────────────────
 
 describe('AuthService.logout', () => {
   it('should unset refreshToken', async () => {
@@ -201,7 +191,6 @@ describe('AuthService.logout', () => {
   });
 });
 
-// ─── refresh ─────────────────────────────────────────────────────────────────
 
 const TEST_SECRET = 'test-jwt-secret-that-is-at-least-64-chars-long-for-compliance-xyz';
 
@@ -211,8 +200,7 @@ describe('AuthService.refresh', () => {
     const oldToken = realJwt.sign(
       { _id: FAKE_USER_ID.toString() },
       TEST_SECRET,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { expiresIn: '7d' } as any,
+      { expiresIn: '7d' } as import('jsonwebtoken').SignOptions,
     );
 
     mockUser.findOneAndUpdate.mockReturnValue({
@@ -233,8 +221,7 @@ describe('AuthService.refresh', () => {
     const oldToken = realJwt.sign(
       { _id: FAKE_USER_ID.toString() },
       TEST_SECRET,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { expiresIn: '7d' } as any,
+      { expiresIn: '7d' } as import('jsonwebtoken').SignOptions,
     );
 
     mockUser.findOneAndUpdate.mockReturnValue({
@@ -248,7 +235,6 @@ describe('AuthService.refresh', () => {
   });
 });
 
-// ─── verifyEmail ─────────────────────────────────────────────────────────────
 
 describe('AuthService.verifyEmail', () => {
   it('should mark user verified and send welcome email', async () => {
@@ -269,7 +255,6 @@ describe('AuthService.verifyEmail', () => {
   });
 });
 
-// ─── forgotPassword ──────────────────────────────────────────────────────────
 
 describe('AuthService.forgotPassword', () => {
   it('should send reset email when user exists', async () => {
@@ -287,7 +272,6 @@ describe('AuthService.forgotPassword', () => {
   });
 });
 
-// ─── resetPassword ────────────────────────────────────────────────────────────
 
 describe('AuthService.resetPassword', () => {
   it('should update password and invalidate refresh token', async () => {

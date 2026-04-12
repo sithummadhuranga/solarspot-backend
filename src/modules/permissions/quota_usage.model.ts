@@ -1,9 +1,4 @@
-/**
- * QuotaUsage model — tracks API call counts per service per time window.
- *
- * Ref: PROJECT_OVERVIEW.md → Quota Management → MongoDB M0 Free Tier Limits
- *      MASTER_PROMPT.md → Quota Service — 80% of free-tier limits enforced
- */
+
 
 import { Schema, model, Document } from 'mongoose';
 

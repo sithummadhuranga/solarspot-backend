@@ -1,15 +1,4 @@
-/**
- * Seeder 00 — system_meta
- *
- * Owner: Member 4
- * Creates the single system_meta document that records:
- *   - schemaVersion
- *   - seedManifestHash (SHA-256 of all seed data — used by seed:verify)
- *   - seededAt timestamp
- *
- * Ref: PROJECT_OVERVIEW.md → Database → system_meta collection
- *      PROJECT_OVERVIEW.md → Seeder Commands → seed:verify
- */
+
 
 import crypto from 'crypto';
 import { ClientSession } from 'mongoose';

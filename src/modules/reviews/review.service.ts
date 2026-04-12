@@ -1,11 +1,4 @@
-/**
- * Review service — business logic layer.
- *
- * Owner: Member 2
- * Ref: PROJECT_OVERVIEW.md → API Endpoints → Reviews (9 endpoints)
- *      MASTER_PROMPT.md → ACID — compound unique index, post-save hook for averageRating
- *      MASTER_PROMPT.md → SOLID — SRP: only business logic here, no HTTP concerns
- */
+
 
 import { Types } from 'mongoose';
 import { Review } from './review.model';
@@ -23,24 +16,14 @@ import { container } from '@/container';
 import ApiError from '@utils/ApiError';
 import logger from '@utils/logger';
 
-// ── Module-level constants ────────────────────────────────────────────────────
 
-/**
- * Toxicity score (0–1) above which a review is automatically rejected.
- * Perspective API uses 0.8 as the "likely toxic" boundary on most classifiers.
- */
+
 const TOXICITY_AUTO_REJECT = 0.80;
 
-/**
- * Toxicity score above which a review is queued for human review (pending)
- * rather than being auto-approved.
- */
+
 const TOXICITY_PENDING_THRESHOLD = 0.60;
 
-/**
- * Number of distinct user flags that triggers automatic escalation of
- * moderationStatus to 'flagged'. Keeps the moderation queue manageable.
- */
+
 const FLAG_AUTO_ESCALATE_THRESHOLD = 3;
 const DUPLICATE_REVIEW_MESSAGE = 'You have already reviewed this station. Edit or delete your existing review before posting a new one.';
 
@@ -67,7 +50,6 @@ function isReviewDuplicateKeyError(error: unknown): boolean {
   return 'station' in keyPattern && 'author' in keyPattern;
 }
 
-// ── Sort mapping ─────────────────────────────────────────────────────────────
 function buildSort(sort: string): Record<string, 1 | -1> {
   switch (sort) {
     case 'oldest':  return { createdAt: 1 };
@@ -81,15 +63,7 @@ function buildSort(sort: string): Record<string, 1 | -1> {
 
 const HF_MODERATION_URL = 'https://router.huggingface.co/hf-inference/models/unitary/toxic-bert';
 
-/**
- * Calls the HuggingFace Inference API (unitary/toxic-bert) and returns a
- * normalised toxicity score (0–1). toxic-bert is a BERT-based classifier
- * trained on millions of labelled toxic comments — it returns a direct
- * probability rather than requiring a structured prompt.
- *
- * Throws on network error, timeout, model-loading state, or malformed
- * response so the caller can fall back to the local scorer.
- */
+
 async function callHuggingFaceModerator(content: string): Promise<number> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
@@ -116,7 +90,6 @@ async function callHuggingFaceModerator(content: string): Promise<number> {
     throw err;
   }
 
-  // Model in cold-start / loading state — treat as unavailable, let caller fall back
   if (typeof responseData === 'object' && responseData !== null && 'error' in responseData) {
     const errObj = responseData as { error: string; estimated_time?: number };
     throw new Error(
@@ -124,7 +97,6 @@ async function callHuggingFaceModerator(content: string): Promise<number> {
     );
   }
 
-  // Expected shape: [[{ label: 'toxic', score: 0.02 }, { label: 'non-toxic', score: 0.98 }]]
   const results = responseData as Array<Array<{ label: string; score: number }>>;
   const inner = results?.[0];
   if (!Array.isArray(inner)) {
@@ -147,24 +119,14 @@ async function callHuggingFaceModerator(content: string): Promise<number> {
   return score;
 }
 
-/**
- * Local regex-based fallback scorer — zero cost, zero network dependency.
- *
- * Scoring is additive (capped at 1.0):
- *   Tier 1 — explicit threats               → +0.80
- *   Tier 2 — severe slurs / KYS             → +0.50
- *   Tier 3 — moderate profanity / attacks   → +0.25
- *   Tier 4 — structural signals (caps/!!!!) → up to +0.15
- */
+
 function localToxicityScore(content: string): number {
   let score = 0;
   const text = content.toLowerCase();
 
   const THREAT_PATTERNS: RegExp[] = [
-    // Direct violence verb targeting a person (you, him, her, them, the owner, etc.)
     /\b(kill|murder|shoot|stab|rape|strangle)\s+(you|him|her|them|u)\b/i,
     /\b(kill|murder|shoot|stab|strangle)\s+the\s+\w+/i,
-    // "I will/am going to kill/hurt [anyone]" — no restriction on the target word
     /\bi\s+(will|am going to|gonna|shall)\s+(kill|hurt|destroy|harm|attack)\b/i,
     /\byou('re| are| will be)\s+(going to\s+)?(die|dead|finished)\b/i,
     /\bi\s+know\s+where\s+you\s+live\b/i,
@@ -172,7 +134,6 @@ function localToxicityScore(content: string): number {
   ];
   if (THREAT_PATTERNS.some((p) => p.test(content))) score += 0.80;
 
-  // Patterns use character-class variants to avoid embedding explicit slurs in source.
   const SEVERE_PATTERNS: RegExp[] = [
     /\bn[i!1][g9][g9][ae3]r+\b/i,
     /\bf[a@4][g9][g9][o0]+t+\b/i,
@@ -183,13 +144,10 @@ function localToxicityScore(content: string): number {
   if (SEVERE_PATTERNS.some((p) => p.test(content))) score += 0.50;
 
   const MEDIUM_PATTERNS: RegExp[] = [
-    // f-word in any form (fuck, fucking, fucked, fucker, wtf, etc.)
     /\bf[u*][c@][k](ing|ed|er|s|head|wit|face|wad)?\b/i,
     /\bwhat\s+the\s+f[u*][c@][k]\b/i,
     /\bwt[f]\b/i,
-    // sh*t in any form
     /\bs[h]?[i!1][t]+\b/i,
-    // a**hole / a**
     /\ba[s$][s$]\s*(hole|hat|wipe|clown|face)?\b/i,
     /\b(b[i!1]tch|bastard|prick|dick|cock|twat|wanker|tosser|douchebag)\b/i,
     /\b(go\s+to\s+hell|shut\s+up|get\s+lost)\b/i,
@@ -208,22 +166,8 @@ function localToxicityScore(content: string): number {
   return Math.min(Math.round(score * 100) / 100, 1.0);
 }
 
-/**
- * Screens review content for toxicity using a two-tier cascade:
- *
- * 1. HuggingFace toxic-bert (primary AI — requires HUGGINGFACE_API_KEY):
- *    BERT classifier trained on millions of toxic comments; returns a direct
- *    probability with no prompt engineering. Free tier: ~1,000 req/day.
- *
- * 2. Local regex scorer (fallback — always available, zero cost):
- *    Deterministic keyword/pattern matching. Used when HuggingFace is
- *    absent, quota-exhausted, or unreachable.
- *
- * Returns null only when BOTH paths fail unexpectedly, triggering graceful
- * degradation: review is approved and the community 3-flag system handles it.
- */
+
 async function checkToxicity(content: string): Promise<number | null> {
-  // Primary: HuggingFace toxic-bert
   if (config.HUGGINGFACE_API_KEY) {
     try {
       const quotaOk = await container.quotaService.check('huggingface');
@@ -241,7 +185,6 @@ async function checkToxicity(content: string): Promise<number | null> {
     }
   }
 
-  // Fallback: local regex scorer — always available, deterministic, zero-cost
   try {
     return localToxicityScore(content);
   } catch (err) {
@@ -250,16 +193,14 @@ async function checkToxicity(content: string): Promise<number | null> {
   }
 }
 
-// ─── Service functions ───────────────────────────────────────────────────────
 
-/** GET /api/reviews — list reviews with filters & pagination */
+
 export async function listReviews(query: ListReviewsQuery) {
   const { page = 1, limit = 10, stationId, authorId, moderationStatus, sort = 'newest' } = query;
   const skip = (page - 1) * limit;
 
   const filter: Record<string, unknown> = { isActive: true };
 
-  // Public listing only shows approved reviews by default
   if (moderationStatus) {
     filter.moderationStatus = moderationStatus;
   } else {
@@ -297,7 +238,7 @@ export async function listReviews(query: ListReviewsQuery) {
   };
 }
 
-/** GET /api/reviews/:id — get a single review */
+
 export async function getReviewById(id: string) {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Review not found');
 
@@ -311,7 +252,7 @@ export async function getReviewById(id: string) {
   return review;
 }
 
-/** POST /api/reviews — create a review */
+
 export async function createReview(authorId: string, input: CreateReviewInput): Promise<IReview> {
   const { station: stationId, rating, title, content } = input;
 
@@ -319,19 +260,15 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
     throw ApiError.notFound('Station not found');
   }
 
-  // Station must exist, be active and approved
   const station = await Station.findOne({ _id: stationId, isActive: true, status: 'active' });
   if (!station) {
     throw ApiError.notFound('Station not found or not yet approved');
   }
 
-  // Cannot review your own station
   if (station.submittedBy.toString() === authorId) {
     throw ApiError.forbidden('You cannot review your own station');
   }
 
-  // One review per station per user — enforce at application level too
-  // Only check active (non-deleted) reviews so deleted reviews don't block re-submission
   const existing = await Review.findOne({
     station:  new Types.ObjectId(stationId),
     author:   new Types.ObjectId(authorId),
@@ -341,17 +278,9 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
     throw ApiError.conflict(DUPLICATE_REVIEW_MESSAGE);
   }
 
-  // Screen title and content together — a toxic title alone must be enough to reject.
-  // Combining both fields into one string keeps quota usage at 1 call per review
-  // while ensuring neither field can smuggle harmful text past the moderator.
   const textToScreen = [title?.trim(), content].filter(Boolean).join('\n\n');
   const toxicityScore = await checkToxicity(textToScreen);
 
-  // Determine moderation status based on toxicity score:
-  // - null (quota/error): approve by default, flag for manual check if score unavailable
-  // - >= 0.80: auto-reject (clear policy violation threshold from Perspective docs)
-  // - >= 0.60: hold for human review (borderline content)
-  // - < 0.60:  auto-approve
   let moderationStatus: 'approved' | 'pending' | 'rejected' = 'approved';
   if (toxicityScore !== null) {
     if (toxicityScore >= TOXICITY_AUTO_REJECT) {
@@ -371,8 +300,6 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
       content,
       moderationStatus,
       ...(toxicityScore !== null && { toxicityScore }),
-      // If the review is auto-rejected by moderation, keep it stored but mark
-      // it inactive so it doesn't block re-submission by the same author.
       isActive: moderationStatus !== 'rejected',
     });
   } catch (error) {
@@ -386,7 +313,7 @@ export async function createReview(authorId: string, input: CreateReviewInput): 
   return review;
 }
 
-/** PUT /api/reviews/:id — update own review */
+
 export async function updateReview(id: string, authorId: string, input: UpdateReviewInput): Promise<IReview> {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Review not found');
 
@@ -399,9 +326,6 @@ export async function updateReview(id: string, authorId: string, input: UpdateRe
 
   if (input.rating !== undefined) review.rating = input.rating;
 
-  // Apply text field changes first so we screen the final combined state.
-  // Rescreening is triggered by ANY text change — a newly toxic title is just
-  // as harmful as toxic body content, even if the review body stays clean.
   const textChanged = input.title !== undefined || input.content !== undefined;
   if (input.title   !== undefined) review.title   = input.title;
   if (input.content !== undefined) review.content = input.content;
@@ -416,7 +340,6 @@ export async function updateReview(id: string, authorId: string, input: UpdateRe
       } else if (toxicityScore >= TOXICITY_PENDING_THRESHOLD) {
         review.moderationStatus = 'pending';
       } else {
-        // Clean update — restore to approved so it's visible again
         if (review.moderationStatus === 'pending') {
           review.moderationStatus = 'approved';
         }
@@ -429,19 +352,17 @@ export async function updateReview(id: string, authorId: string, input: UpdateRe
   return review;
 }
 
-/** DELETE /api/reviews/:id — soft-delete (own or any for moderators) */
+
 export async function deleteReview(id: string, requesterId: string, canDeleteAny: boolean): Promise<void> {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Review not found');
 
   const review = await Review.findOne({ _id: id, isActive: true });
   if (!review) throw ApiError.notFound('Review not found');
 
-  // Check ownership if user does not have delete-any permission
   if (!canDeleteAny && review.author.toString() !== requesterId) {
     throw ApiError.forbidden('You can only delete your own reviews');
   }
 
-  // Soft delete — atomic $set
   await Review.findOneAndUpdate(
     { _id: id },
     { $set: { isActive: false, deletedAt: new Date(), deletedBy: new Types.ObjectId(requesterId) } },
@@ -450,14 +371,13 @@ export async function deleteReview(id: string, requesterId: string, canDeleteAny
   logger.info(`[reviews] Soft-deleted review ${id} by user ${requesterId}`);
 }
 
-/** POST /api/reviews/:id/helpful — toggle helpful vote (atomic) */
+
 export async function toggleHelpful(id: string, userId: string) {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Review not found');
 
   const review = await Review.findOne({ _id: id, isActive: true, moderationStatus: 'approved' });
   if (!review) throw ApiError.notFound('Review not found');
 
-  // Cannot mark your own review as helpful
   if (review.author.toString() === userId) {
     throw ApiError.forbidden('You cannot mark your own review as helpful');
   }
@@ -466,7 +386,6 @@ export async function toggleHelpful(id: string, userId: string) {
   const alreadyVoted = review.helpfulVotes.some((v) => v.toString() === userId);
 
   if (alreadyVoted) {
-    // Remove vote — atomic $pull + $inc
     await Review.findOneAndUpdate(
       { _id: id },
       { $pull: { helpfulVotes: userOid }, $inc: { helpfulCount: -1 } },
@@ -474,7 +393,6 @@ export async function toggleHelpful(id: string, userId: string) {
     logger.info(`[reviews] User ${userId} removed helpful vote from review ${id}`);
     return { action: 'removed' as const };
   } else {
-    // Add vote — atomic $addToSet + $inc
     await Review.findOneAndUpdate(
       { _id: id },
       { $addToSet: { helpfulVotes: userOid }, $inc: { helpfulCount: 1 } },
@@ -484,14 +402,13 @@ export async function toggleHelpful(id: string, userId: string) {
   }
 }
 
-/** POST /api/reviews/:id/flag — flag a review */
+
 export async function flagReview(id: string, userId: string) {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Review not found');
 
   const review = await Review.findOne({ _id: id, isActive: true });
   if (!review) throw ApiError.notFound('Review not found');
 
-  // Cannot flag your own review
   if (review.author.toString() === userId) {
     throw ApiError.forbidden('You cannot flag your own review');
   }
@@ -499,7 +416,6 @@ export async function flagReview(id: string, userId: string) {
   const userOid = new Types.ObjectId(userId);
   const alreadyFlagged = review.flaggedBy.some((f) => f.toString() === userId);
 
-  // Toggle: if user already flagged, retract the flag
   if (alreadyFlagged) {
     const newFlagCount = Math.max(0, review.flagCount - 1);
     const unflagged = await Review.findOneAndUpdate(
@@ -517,8 +433,6 @@ export async function flagReview(id: string, userId: string) {
 
   const newFlagCount = review.flagCount + 1;
 
-  // Auto-escalate to 'flagged' status once enough distinct users have flagged the review.
-  // This surfaces the review immediately in the moderation queue without manual triage.
   const shouldEscalate = newFlagCount >= FLAG_AUTO_ESCALATE_THRESHOLD;
   const updateFields: Record<string, unknown> = {
     $addToSet: { flaggedBy: userOid },
@@ -543,7 +457,7 @@ export async function flagReview(id: string, userId: string) {
   return { action: 'flagged' as const, flagCount: updated?.flagCount ?? 0, escalated: shouldEscalate };
 }
 
-/** GET /api/reviews/flagged — list flagged reviews for moderators */
+
 export async function listFlaggedReviews(page: number, limit: number) {
   const skip = (page - 1) * limit;
 
@@ -568,7 +482,7 @@ export async function listFlaggedReviews(page: number, limit: number) {
   };
 }
 
-/** PATCH /api/reviews/:id/moderate — approve or reject a review */
+
 export async function moderateReview(id: string, moderatorId: string, input: ModerateReviewInput): Promise<IReview> {
   if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Review not found');
 
@@ -581,13 +495,10 @@ export async function moderateReview(id: string, moderatorId: string, input: Mod
   review.moderationNote = input.moderationNote ?? undefined;
 
   if (input.moderationStatus === 'approved') {
-    // Clear flag state so the review surfaces cleanly
     review.isFlagged = false;
     review.flaggedBy = [];
     review.flagCount = 0;
   } else if (input.moderationStatus === 'rejected') {
-    // Mark inactive so the author can re-submit a corrected review.
-    // Mirrors the auto-reject path in createReview (isActive: moderationStatus !== 'rejected').
     review.isActive = false;
   }
 

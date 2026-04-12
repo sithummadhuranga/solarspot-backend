@@ -1,16 +1,4 @@
-/**
- * Production admin seeder — seeds a single, real admin account.
- *
- * Credentials are read from env vars so they are never hardcoded in source:
- *   ADMIN_EMAIL     (required)
- *   ADMIN_PASSWORD  (required, min 8 chars)
- *
- * Operation is a pure upsert (idempotent) — safe to re-run without
- * creating duplicates or overwriting manual changes to other fields.
- *
- * Depends on: 03_roles (admin role must already exist)
- * ⚠️  Do NOT include in demo or dev-only seed chains.
- */
+
 
 import bcrypt from 'bcryptjs';
 import { ClientSession } from 'mongoose';
@@ -56,7 +44,6 @@ export async function seedProductionAdmin(session: ClientSession): Promise<void>
         isActive:        true,
         isBanned:        false,
       },
-      // Only set displayName and createdAt if this is a new document.
       $setOnInsert: {
         displayName: 'SolarSpot Admin',
       },

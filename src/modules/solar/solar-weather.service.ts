@@ -1,8 +1,4 @@
-/**
- * Solar weather service — the only solar-module code that calls OpenWeatherMap.
- *
- * Ref: SolarIntelligence_Module_Prompt.md → A2
- */
+
 
 import axios from 'axios';
 import NodeCache from 'node-cache';
@@ -102,7 +98,6 @@ export function calculateSolarOutput(
 ): SolarCalculation {
   const cloudFactor = 1 - (weather.cloudCoverPct / 100);
   const uvFactor = Math.min(weather.uvIndex / 10, 1);
-  // 85% is a practical industry-standard allowance for inverter and system losses.
   const efficiency = 0.85;
   const estimatedOutputKw = Number(
     Math.max(0, solarPanelKw * cloudFactor * uvFactor * efficiency).toFixed(2),

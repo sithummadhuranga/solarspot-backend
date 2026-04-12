@@ -1,14 +1,4 @@
-/**
- * Seeder 03 — roles
- *
- * Owner: Member 4
- * Seeds all 10 role documents.
- *
- * Ref: PROJECT_OVERVIEW.md → Roles — 10 Total
- *
- * Depends on: none (roles are standalone documents)
- * Data is additive (upsert by name) — safe to re-run.
- */
+
 
 import { ClientSession } from 'mongoose';
 import { RoleSlug } from '@/types';
@@ -22,8 +12,6 @@ interface RoleSeed {
   isSystem: boolean;
 }
 
-// ─── Seed data — 10 roles ────────────────────────────────────────────────────
-// Ref: PROJECT_OVERVIEW.md → Roles
 export const ROLES_SEED: RoleSeed[] = [
   { name: 'guest',                displayName: 'Visitor',              roleLevel: 0, isSystem: true  },
   { name: 'user',                 displayName: 'Member',               roleLevel: 1, isSystem: true  },

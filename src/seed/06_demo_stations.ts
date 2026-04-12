@@ -1,14 +1,4 @@
-/**
- * Seeder 06 — demo_stations
- *
- * Owner: Member 1 — implement demo station shapes.
- * Owner: Member 4 — runs this as part of the seed pipeline.
- *
- * Seeds sample solar charging stations across Sri Lanka for development.
- * Depends on: 03_roles, 05_demo_users (stations need a submittedBy user)
- *
- * ⚠️  DEV ONLY — never run seed:demo in production.
- */
+
 
 import { ClientSession } from 'mongoose';
 import { Station } from '@modules/stations/station.model';

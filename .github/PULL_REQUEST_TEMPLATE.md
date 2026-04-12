@@ -9,10 +9,10 @@
 - [ ] chore: Config / setup
 
 ## Module
-- [ ] Station Management — Member 1
-- [ ] Review System — Member 2
-- [ ] Weather Intelligence — Member 3
-- [ ] Auth / Users — Member 4
+- [ ] Station Management — Sathush Nanyakkara (@sathufit)
+- [ ] Review System — Nimnath Nadushka (@nnimnath)
+- [ ] Weather Intelligence — Sithum Madhuranga (@sithummadhuranga)
+- [ ] Auth / Users — Christine Lowe (@christineshwethalowe)
 
 ## Checklist
 - [ ] `npm run lint` passes

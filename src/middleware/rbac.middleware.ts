@@ -4,9 +4,7 @@ import { container } from '@/container';
 import ApiError from '@utils/ApiError';
 import { PermissionAction } from '@/types';
 
-/** Role hierarchy — mirrors the seeded roleLevel values in the roles collection.
- *  Used as a fallback when roleLevel is absent from req.user (e.g. old tokens).
- *  Primary path: roleLevel is now embedded in the JWT access token by auth.service. */
+
 export const ROLES = {
   guest:                0,
   user:                 1,
@@ -22,14 +20,7 @@ export const ROLES = {
 
 export type RoleName = keyof typeof ROLES;
 
-/**
- * checkPermission — RBAC + PBAC middleware factory.
- * Uses PermissionEngine.evaluate() to check role permissions and all attached policies.
- *
- * @param action — e.g. 'stations:approve', 'reviews:moderate'
- *
- * Usage: router.post('/', protect, checkPermission('stations:create'), validate(...), controller)
- */
+
 export const checkPermission =
   (action: PermissionAction) =>
   async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
@@ -46,7 +37,6 @@ export const checkPermission =
       isBanned: req.user.isBanned ?? false,
     };
 
-    // Resource document for owner_match and field_equals policies
     const resource = (req as Request & { resource?: Document }).resource;
 
     const result = await container.permissionEngine.evaluate(user, action, resource);
@@ -58,13 +48,7 @@ export const checkPermission =
     next();
   };
 
-/**
- * loadResource — middleware that loads a Mongoose document into req.resource.
- * Used before checkPermission() when policies need to evaluate the resource.
- *
- * @param Model — Mongoose model to query
- * @param idParam — route param name (default: 'id')
- */
+
 export function loadResource(Model: { findById: (id: string) => Promise<Document | null> }, idParam = 'id') {
   return async (req: Request & { resource?: Document }, _res: Response, next: NextFunction): Promise<void> => {
     const id = String(req.params[idParam]);

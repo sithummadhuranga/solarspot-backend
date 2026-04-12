@@ -1,21 +1,4 @@
-/**
- * PermissionEngine — single responsibility: evaluate whether a user can perform an action.
- *
- * Owner: Member 4
- * Ref:  PROJECT_OVERVIEW.md → Permissions — 35 Actions
- *       PROJECT_OVERVIEW.md → Policies — 13 Built-in
- *       MASTER_PROMPT.md → SOLID → Open/Closed (PolicyEngine)
- *       MASTER_PROMPT.md → Permission System → Never Hardcode Permission Checks in Services
- *
- * This engine is called by checkPermission middleware — NEVER call it from services.
- * Services trust the middleware layer has already authorised the caller.
- *
- * Cache strategy:
- *   Permission graph is cached in-process for 5 minutes (node-cache).
- *   Any mutation to roles/permissions/overrides MUST call flush() to invalidate.
- *
- * DI: Wired in src/container.ts at startup.
- */
+
 
 import { Document, Types } from 'mongoose';
 import NodeCache from 'node-cache';
@@ -25,9 +8,6 @@ import { Review } from '@modules/reviews/review.model';
 import logger from '@utils/logger';
 import { IUserForPermission, EvaluationResult, PermissionAction, PolicyCondition, IPolicy } from '@/types';
 
-// ─── Policy condition handler signature ─────────────────────────────────────
-// OCP: add a new PolicyCondition by adding ONE handler + registering it below.
-// Never modify existing handlers.
 type ConditionHandler = (
   config: Record<string, unknown>,
   user: IUserForPermission,
@@ -36,11 +16,9 @@ type ConditionHandler = (
 
 const CACHE_TTL_SECONDS = 300; // 5 minutes
 
-// ─── PermissionEngine ────────────────────────────────────────────────────────
 export class PermissionEngine {
   private readonly cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, useClones: false });
 
-  // OCP: policy condition handlers registry — add handler here, never modify existing ones
   private readonly conditionHandlers = new Map<PolicyCondition, ConditionHandler>([
     ['email_verified',  this.handleEmailVerified.bind(this)],
     ['account_active',  this.handleAccountActive.bind(this)],
@@ -54,42 +32,25 @@ export class PermissionEngine {
     ['field_equals',    this.handleFieldEquals.bind(this)],
   ]);
 
-  /**
-   * Evaluate whether `user` is allowed to perform `action` on optional `resource`.
-   *
-   * Algorithm:
-   * 1. Admin bypass — roleLevel 4 always allowed
-   * 2. Look up role's role_permissions from DB (cached for 5 mins)
-   * 3. Find the matching permission for `action`
-   * 4. If no permission found → deny
-   * 5. Check per-user override (grant or deny override wins over role default)
-   * 6. Evaluate attached policies in order — any deny policy blocks, all allow policies must pass
-   * 7. Return EvaluationResult
-   */
+  
   async evaluate(
     user: IUserForPermission,
     action: PermissionAction,
     resource?: Document,
   ): Promise<EvaluationResult> {
-    // Step 1: Admin bypass — admins are always allowed, no policy evaluation
-    // This is intentional: if an admin is locked out, there is no recovery path.
     if (user.roleLevel >= 4) {
       return { allowed: true, reason: 'Admin bypass' };
     }
 
     try {
-      // Step 2: Load role's permissions (from cache or DB)
       const rolePermissions = await this.getRolePermissions(user.role);
 
-      // Step 3: Find the matching permission for this action
       const rolePermission = rolePermissions.find(
         (rp: { permission: { action: string }; policies: IPolicy[] }) =>
           rp.permission?.action === action,
       );
 
-      // Step 4: If the role doesn't have this permission at all → deny
       if (!rolePermission) {
-        // Step 4b: But check for user-level grant override first
         const override = await this.getUserOverride(user._id, action);
         if (override?.effect === 'grant') {
           return { allowed: true, reason: 'User override: grant' };
@@ -97,7 +58,6 @@ export class PermissionEngine {
         return { allowed: false, reason: `Role does not have permission: ${action}` };
       }
 
-      // Step 5: Check per-user override — takes precedence over role default
       const override = await this.getUserOverride(user._id, action);
       if (override) {
         if (override.effect === 'deny') {
@@ -108,7 +68,6 @@ export class PermissionEngine {
         }
       }
 
-      // Step 6: Evaluate attached policies
       const policies: IPolicy[] = rolePermission.policies ?? [];
       for (const policy of policies) {
         const handler = this.conditionHandlers.get(policy.condition as PolicyCondition);
@@ -138,7 +97,6 @@ export class PermissionEngine {
     }
   }
 
-  // ─── Private helpers ────────────────────────────────────────────────────────
 
   private async getRolePermissions(roleId: string): Promise<Array<{ permission: { action: string }; policies: IPolicy[] }>> {
     const cacheKey = `role_perms:${roleId}`;
@@ -162,7 +120,6 @@ export class PermissionEngine {
     const cached = this.cache.get<{ effect: 'grant' | 'deny' } | null>(cacheKey);
     if (cached !== undefined) return cached;
 
-    // Filter out expired overrides at query time
     const override = await UserPermissionOverride.findOne({
       user: userId,
       $or: [{ expiresAt: { $exists: false } }, { expiresAt: { $gt: new Date() } }],
@@ -178,8 +135,6 @@ export class PermissionEngine {
     return result;
   }
 
-  // ─── Policy condition handlers ───────────────────────────────────────────
-  // OCP: each handler is self-contained. Add new ones; never edit existing.
 
   private async handleEmailVerified(_cfg: Record<string, unknown>, user: IUserForPermission): Promise<boolean> {
     return user.isEmailVerified;
@@ -190,7 +145,6 @@ export class PermissionEngine {
   }
 
   private async handleCheckBanned(_cfg: Record<string, unknown>, user: IUserForPermission): Promise<boolean> {
-    // Effect is 'allow', so returning false blocks. This denies banned users.
     return user.isActive && !user.isBanned;
   }
 
@@ -211,7 +165,6 @@ export class PermissionEngine {
     user: IUserForPermission,
     resource?: Document,
   ): Promise<boolean> {
-    // Used as a 'deny' policy — returns true (trigger deny) if user already reviewed
     if (!resource) return false;
     const stationId = (resource as unknown as Record<string, unknown>)['_id'];
     if (!stationId) return false;
@@ -246,7 +199,6 @@ export class PermissionEngine {
     user: IUserForPermission,
     resource?: Document,
   ): Promise<boolean> {
-    // Used as 'deny' — returns true (trigger deny) if user authored the review
     if (!resource) return false;
     const authorId = (resource as unknown as Record<string, unknown>)['author'];
     if (!authorId) return false;
@@ -272,7 +224,6 @@ export class PermissionEngine {
     user: IUserForPermission,
   ): Promise<boolean> {
     const minLevel = (cfg['minLevel'] as number | undefined) ?? 0;
-    // Used as 'deny' for admin_protection — condition is met (deny fires) if user level >= minLevel
     return user.roleLevel >= minLevel;
   }
 
@@ -290,19 +241,13 @@ export class PermissionEngine {
     return resourceValue === value;
   }
 
-  /**
-   * Flush the permission cache.
-   * Must be called after ANY mutation to: roles, permissions, policies,
-   * role_permissions, or user_permission_overrides.
-   */
+  
   flush(userId?: string): void {
     if (userId) {
-      // Flush only this user's override cache entries
       const keys = this.cache.keys().filter(k => k.startsWith(`user_override:${userId}:`));
       this.cache.del(keys);
       logger.debug(`PermissionEngine: flushed cache for user ${userId} (${keys.length} entries)`);
     } else {
-      // Full flush — e.g., after role or permission change
       this.cache.flushAll();
       logger.debug('PermissionEngine: flushed entire permission cache');
     }

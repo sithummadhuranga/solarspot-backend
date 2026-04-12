@@ -1,8 +1,4 @@
-/**
- * UserPermissionOverride model — per-user permission grants/revocations.
- *
- * Ref: PROJECT_OVERVIEW.md → RBAC → User Permission Override
- */
+
 
 import { Schema, model } from 'mongoose';
 import type { IUserPermissionOverride } from '@/types';

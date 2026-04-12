@@ -1,7 +1,4 @@
-/**
- * Integration tests — Permissions endpoints
- * Ref: MASTER_PROMPT.md → Testing → Integration tests hit actual Express router + in-memory DB
- */
+
 
 import request  from 'supertest';
 import app      from '../../../app';
@@ -39,8 +36,6 @@ beforeAll(async () => {
   regularToken = reg.token;
   targetUserId = reg.userId;
 
-  // Promote to 'admin' role so the JWT carries roleLevel=4 and the
-  // permission engine's admin bypass fires on every admin endpoint.
   const adminRole = await Role.findOne({ name: 'admin' }).lean();
   if (adminRole) {
     await User.findByIdAndUpdate(adm.userId, { role: adminRole._id });
@@ -55,7 +50,6 @@ afterAll(async () => {
   await disconnectTestDb();
 });
 
-// ─── GET /api/admin/permissions ───────────────────────────────────────────────
 
 describe('GET /api/admin/permissions', () => {
   it('200 — super_admin can list all seeded permissions', async () => {
@@ -77,7 +71,6 @@ describe('GET /api/admin/permissions', () => {
   });
 });
 
-// ─── GET /api/admin/roles ─────────────────────────────────────────────────────
 
 describe('GET /api/admin/roles', () => {
   it('200 — returns all 10 seeded roles', async () => {
@@ -90,7 +83,6 @@ describe('GET /api/admin/roles', () => {
   });
 });
 
-// ─── GET /api/admin/roles/:id/permissions ────────────────────────────────────
 
 describe('GET /api/admin/roles/:id/permissions', () => {
   it('200 — returns permissions assigned to a role', async () => {
@@ -104,7 +96,6 @@ describe('GET /api/admin/roles/:id/permissions', () => {
   });
 });
 
-// ─── POST /api/admin/roles/:id/permissions ────────────────────────────────────
 
 describe('POST /api/admin/roles/:id/permissions', () => {
   it('201 — assigns a new permission to a role', async () => {
@@ -116,12 +107,10 @@ describe('POST /api/admin/roles/:id/permissions', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ permissionId: String(perm!._id) });
 
-    // 201 created or 409 if already assigned from seedRolePermissions
     expect([201, 409]).toContain(res.status);
   });
 });
 
-// ─── GET /api/admin/users/:id/permissions ────────────────────────────────────
 
 describe('GET /api/admin/users/:id/permissions', () => {
   it('200 — returns effective permissions (base + overrides)', async () => {
@@ -134,7 +123,6 @@ describe('GET /api/admin/users/:id/permissions', () => {
   });
 });
 
-// ─── GET /api/admin/users/:id/permissions/matrix ────────────────────────────
 
 describe('GET /api/admin/users/:id/permissions/matrix', () => {
   it('200 — returns permission states with role and override sources', async () => {
@@ -157,7 +145,6 @@ describe('GET /api/admin/users/:id/permissions/matrix', () => {
   });
 });
 
-// ─── POST /api/admin/users/:id/permissions ───────────────────────────────────
 
 describe('POST /api/admin/users/:id/permissions', () => {
   let grantedPermId: string;
@@ -175,7 +162,6 @@ describe('POST /api/admin/users/:id/permissions', () => {
   });
 });
 
-// ─── POST /api/permissions/check ─────────────────────────────────────────────
 
 describe('POST /api/permissions/check', () => {
   it('200 — returns granted: true for a known action', async () => {
@@ -197,7 +183,6 @@ describe('POST /api/permissions/check', () => {
   });
 });
 
-// ─── GET /api/admin/audit-logs ────────────────────────────────────────────────
 
 describe('GET /api/admin/audit-logs', () => {
   it('200 — returns paginated audit logs', async () => {
@@ -210,7 +195,6 @@ describe('GET /api/admin/audit-logs', () => {
   });
 });
 
-// ─── GET /api/permissions/admin/quota ────────────────────────────────────────
 
 describe('GET /api/permissions/admin/quota', () => {
   it('200 — returns quota stats', async () => {

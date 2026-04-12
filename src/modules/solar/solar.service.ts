@@ -1,8 +1,4 @@
-/**
- * Solar service — business logic for the Solar Intelligence module.
- *
- * Ref: SolarIntelligence_Module_Prompt.md → A3
- */
+
 
 import mongoose, { Types } from 'mongoose';
 import { AuditLog } from '@modules/permissions/audit_log.model';
@@ -401,9 +397,9 @@ export async function getReports(
   }
 
   if (canModerateSolarReports(viewer)) {
-    // full visibility for moderators/admins
+    void 0;
   } else if (viewer?._id && requestedUserId === viewer._id) {
-    // own report management view
+    void 0;
   } else if (viewer?._id) {
     filter['$or'] = [
       { status: 'published', isPublic: true },

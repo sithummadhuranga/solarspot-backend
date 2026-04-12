@@ -1,14 +1,8 @@
-/**
- * Review validation schemas (Joi).
- *
- * Owner: Member 2
- * Ref: PROJECT_OVERVIEW.md → API Endpoints → Reviews
- *      MASTER_PROMPT.md → Security → Input Validation — Strict Joi Schemas
- */
+
 
 import Joi from 'joi';
 
-/** POST /api/reviews — create a review */
+
 export const createReviewSchema = Joi.object({
   station: Joi.string().trim().required().messages({
     'string.empty': 'Station ID is required',
@@ -27,14 +21,14 @@ export const createReviewSchema = Joi.object({
   }),
 }).options({ stripUnknown: true });
 
-/** PUT /api/reviews/:id — update own review */
+
 export const updateReviewSchema = Joi.object({
   rating:  Joi.number().integer().min(1).max(5).optional(),
   title:   Joi.string().trim().max(120).allow('').optional(),
   content: Joi.string().trim().min(10).max(2000).optional(),
 }).min(1).options({ stripUnknown: true });
 
-/** PATCH /api/reviews/:id/moderate — moderate a review */
+
 export const moderateReviewSchema = Joi.object({
   moderationStatus: Joi.string().valid('approved', 'rejected').required().messages({
     'any.only': 'Moderation status must be "approved" or "rejected"',
@@ -43,12 +37,12 @@ export const moderateReviewSchema = Joi.object({
   moderationNote: Joi.string().trim().max(500).optional(),
 }).options({ stripUnknown: true });
 
-/** POST /api/reviews/:id/flag — flag a review */
+
 export const flagReviewSchema = Joi.object({
   reason: Joi.string().trim().max(500).optional(),
 }).options({ stripUnknown: true });
 
-/** GET /api/reviews — list reviews (query) */
+
 export const listReviewsQuerySchema = Joi.object({
   page:             Joi.number().integer().min(1).default(1),
   limit:            Joi.number().integer().min(1).max(50).default(10),
@@ -62,7 +56,7 @@ export const listReviewsQuerySchema = Joi.object({
   sort:             Joi.string().valid('newest', 'oldest', 'highest', 'lowest', 'helpful').default('newest'),
 }).options({ stripUnknown: true });
 
-/** GET /api/reviews/flagged — list flagged reviews (query) */
+
 export const listFlaggedQuerySchema = Joi.object({
   page:  Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(50).default(10),

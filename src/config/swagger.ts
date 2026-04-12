@@ -62,7 +62,6 @@ const options: swaggerJsdoc.Options = {
             hasPrev: { type: 'boolean', example: false },
           },
         },
-        // ── Weather / Solar Intelligence ─────────────────────────────────────
         WeatherData: {
           type: 'object',
           properties: {
@@ -111,7 +110,6 @@ const options: swaggerJsdoc.Options = {
             cloudCover: { type: 'number', example: 30 },
           },
         },
-        // ── Solar Intelligence & Charging Analytics ────────────────────────
         WeatherSnapshot: {
           type: 'object',
           properties: {
@@ -287,9 +285,7 @@ const options: swaggerJsdoc.Options = {
     },
     security: [{ bearerAuth: [] }],
   },
-  // Scan both routes and controller files — some modules co-locate @swagger JSDoc
-  // in the controller (weather, auth, users, permissions); stations uses routes.
-  apis: ['./src/modules/**/*.routes.ts', './src/modules/**/*.controller.ts'],
+  apis: ['./src/modules*.routes.ts', './src/modules*.controller.ts'],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

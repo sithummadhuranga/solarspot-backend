@@ -1,13 +1,7 @@
-/**
- * User & Auth TypeScript interfaces.
- * Owner: Member 4 — expand fields when implementing the model.
- * Ref: PROJECT_OVERVIEW.md → Database → users collection
- */
+
 
 import { Document, Types } from 'mongoose';
 
-// ─── Role slugs ─────────────────────────────────────────────────────────────
-// Ref: PROJECT_OVERVIEW.md → Roles — 10 Total
 export type RoleSlug =
   | 'guest'
   | 'user'
@@ -20,7 +14,6 @@ export type RoleSlug =
   | 'moderator'
   | 'admin';
 
-// ─── User document ──────────────────────────────────────────────────────────
 export interface IUser extends Document {
   _id: Types.ObjectId;
   displayName: string;
@@ -42,11 +35,9 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
   
-  // Methods
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
-// ─── Role document ──────────────────────────────────────────────────────────
 export interface IRole extends Document {
   _id: Types.ObjectId;
   name: RoleSlug;
@@ -56,7 +47,6 @@ export interface IRole extends Document {
   isActive: boolean;
 }
 
-// ─── DTOs ───────────────────────────────────────────────────────────────────
 export interface CreateUserInput {
   displayName: string;
   email: string;

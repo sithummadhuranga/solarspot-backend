@@ -1,17 +1,4 @@
-/**
- * EmailService — single responsibility: send HTML emails via Brevo (SMTP).
- *
- * Owner: Member 4 — implement all methods.
- * Ref:  PROJECT_OVERVIEW.md → Email Templates (7 templates)
- *       MASTER_PROMPT.md → SOLID → Single Responsibility
- *       MASTER_PROMPT.md → SOLID → Open/Closed (add template = add method + file, never touch send())
- *
- * DI contract: depends on IMailTransport, not Nodemailer directly.
- * Wired in src/container.ts at startup.
- *
- * Template variables convention: {{VARIABLE_NAME}} replaced by send() helper.
- * All templates live in src/templates/*.html
- */
+
 
 import path from 'path';
 import fs from 'fs';
@@ -79,7 +66,6 @@ function resolveTransportMode(): EmailTransportMode {
   return 'smtp';
 }
 
-// ─── Mail transport abstraction (DIP) ───────────────────────────────────────
 export interface IMailTransport {
   sendMail(options: nodemailer.SendMailOptions): Promise<void>;
 }
@@ -156,7 +142,6 @@ class BrevoApiTransport implements IMailTransport {
   }
 }
 
-// In dev/test: logs email HTML to console instead of sending (EMAIL_PREVIEW=true)
 class PreviewTransport implements IMailTransport {
   async sendMail(options: nodemailer.SendMailOptions): Promise<void> {
     logger.info(`[EmailPreview] To: ${options.to} | Subject: ${options.subject}`);
@@ -164,7 +149,6 @@ class PreviewTransport implements IMailTransport {
   }
 }
 
-// ─── EmailService ────────────────────────────────────────────────────────────
 export class EmailService {
   private transport: IMailTransport;
   private readonly transportMode: EmailTransportMode;
@@ -188,7 +172,6 @@ export class EmailService {
     }
   }
 
-  // ─── Core send helper — NEVER call directly from outside this class ────────
   private async send(
     to: string,
     subject: string,
@@ -199,7 +182,6 @@ export class EmailService {
       const templatePath = path.join(this.templatesDir, `${templateName}.html`);
       let html = fs.readFileSync(templatePath, 'utf-8');
 
-      // Replace all {{VARIABLE}} placeholders — OCP: never modify this line
       const allVars = {
         APP_NAME: config.APP_NAME,
         APP_URL: getPublicAppUrl(),
@@ -217,15 +199,12 @@ export class EmailService {
         html,
       });
     } catch (err) {
-      // Email failure must never crash the app — log and continue
       logger.error(`EmailService.send failed for template "${templateName}" via ${this.transportMode}:`, err);
     }
   }
 
-  // ─── Template methods ────────────────────────────────────────────────────
-  // OCP: add a new template = add one method here + one HTML file in /templates
 
-  /** Triggered: POST /api/auth/register */
+  
   async sendVerifyEmail(user: IUserForEmail, verifyUrl: string): Promise<void> {
     await this.send(
       user.email,
@@ -238,7 +217,7 @@ export class EmailService {
     );
   }
 
-  /** Triggered: POST /api/auth/forgot-password */
+  
   async sendPasswordReset(user: IUserForEmail, resetUrl: string): Promise<void> {
     await this.send(
       user.email,
@@ -251,7 +230,7 @@ export class EmailService {
     );
   }
 
-  /** Triggered: GET /api/auth/verify-email/:token (after successful verification) */
+  
   async sendWelcome(user: IUserForEmail): Promise<void> {
     await this.send(
       user.email,
@@ -264,7 +243,7 @@ export class EmailService {
     );
   }
 
-  /** Triggered: PATCH /api/stations/:id/approve */
+  
   async sendStationApproved(user: IUserForEmail, stationName: string, stationUrl: string): Promise<void> {
     await this.send(
       user.email,
@@ -278,7 +257,7 @@ export class EmailService {
     );
   }
 
-  /** Triggered: PATCH /api/stations/:id/reject */
+  
   async sendStationRejected(user: IUserForEmail, stationName: string, reason: string): Promise<void> {
     await this.send(
       user.email,
@@ -292,7 +271,7 @@ export class EmailService {
     );
   }
 
-  /** Triggered: QuotaService when 80% threshold is hit */
+  
   async sendQuotaAlert(adminEmail: string, serviceName: string, percentage: number, todayCount: number): Promise<void> {
     await this.send(
       adminEmail,
@@ -306,7 +285,7 @@ export class EmailService {
     );
   }
 
-  /** Triggered: POST /api/permissions/users/:id/overrides */
+  
   async sendPermissionChange(user: IUserForEmail, changedBy: IUserForEmail, changeDescription: string, effect: 'grant' | 'deny'): Promise<void> {
     await this.send(
       user.email,

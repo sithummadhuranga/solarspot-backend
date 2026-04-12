@@ -1,20 +1,7 @@
-/**
- * Unit tests — WeatherService
- *
- * All external dependencies are mocked so this suite has zero I/O:
- *   - axios          → mocked HTTP calls to OpenWeatherMap
- *   - Station model  → mocked DB queries
- *   - WeatherCache   → mocked DB reads/writes
- *   - container      → mocked QuotaService
- *   - node-cache     → mocked in-memory cache
- *   - logger         → silenced
- *
- * Owner: Member 3 · Ref: MASTER_PROMPT.md → Testing
- */
+
 
 import { Types } from 'mongoose';
 
-// ── Mocks must be hoisted before any imports ───────────────────────────────────
 
 jest.mock('@config/env', () => ({
   config: {
@@ -60,7 +47,6 @@ jest.mock('@/container', () => ({
   },
 }));
 
-// ── Now safe to import the service ────────────────────────────────────────────
 
 import axios from 'axios';
 import WeatherService from '@modules/weather/weather.service';
@@ -76,7 +62,6 @@ const mockCacheGet    = cacheGet as jest.MockedFunction<typeof cacheGet>;
 const mockCacheSet    = cacheSet as jest.MockedFunction<typeof cacheSet>;
 const mockQuota       = container.quotaService as jest.Mocked<typeof container.quotaService>;
 
-// ── Shared fixtures ────────────────────────────────────────────────────────────
 
 const stationId = new Types.ObjectId().toString();
 
@@ -118,12 +103,10 @@ const mockWeatherData = {
   windSpeed:       3.1,
 };
 
-// ── getCurrentWeather ──────────────────────────────────────────────────────────
 
 describe('WeatherService.getCurrentWeather', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Default: quota is available
     mockQuota.check.mockResolvedValue(true);
     mockQuota.increment.mockResolvedValue(undefined);
   });
@@ -233,7 +216,6 @@ describe('WeatherService.getCurrentWeather', () => {
   });
 });
 
-// ── getForecast ────────────────────────────────────────────────────────────────
 
 describe('WeatherService.getForecast', () => {
   beforeEach(() => {
@@ -244,7 +226,6 @@ describe('WeatherService.getForecast', () => {
 
   it('returns forecast from in-memory cache without DB/API calls', async () => {
     const cachedForecast = [{ timestamp: new Date(), temperature: 27 }];
-    // getForecast checks the forecastKey cache first — return data on the very first call
     mockCacheGet.mockReturnValue(cachedForecast);
 
     const result = await WeatherService.getForecast(stationId);
@@ -260,7 +241,6 @@ describe('WeatherService.getForecast', () => {
       lean: jest.fn().mockResolvedValue(mockStationDoc),
     } as never);
     mockAxios.get.mockResolvedValueOnce({ data: mockOWMForecastResponse } as never);
-    // Current weather sub-call also needs quota check — return false so it's skipped gracefully
     mockQuota.check.mockResolvedValueOnce(true).mockResolvedValue(false);
     mockCache.findOneAndUpdate.mockResolvedValue({} as never);
 
@@ -276,7 +256,6 @@ describe('WeatherService.getForecast', () => {
   });
 });
 
-// ── getBestTimes ───────────────────────────────────────────────────────────────
 
 describe('WeatherService.getBestTimes', () => {
   beforeEach(() => {
@@ -286,7 +265,6 @@ describe('WeatherService.getBestTimes', () => {
   });
 
   it('returns only daytime slots sorted chronologically', async () => {
-    // Build a fake forecast with daytime and nighttime slots
     const daySlot = {
       timestamp:     new Date('2026-03-01T07:30:00Z'), // 13:00 local (+5:30)
       temperature:   30,
@@ -304,14 +282,11 @@ describe('WeatherService.getBestTimes', () => {
       precipitation: 0,
     };
 
-    // Spy on getForecast to return controlled data
     jest.spyOn(WeatherService, 'getForecast').mockResolvedValue([daySlot, nightSlot]);
 
     const result = await WeatherService.getBestTimes(stationId);
 
-    // Only the daytime slot should appear
     expect(result.every((s) => s.startHour >= 6 && s.startHour <= 18)).toBe(true);
-    // Reason should be present on every slot
     result.forEach((slot) => {
       expect(slot.reason).toBeTruthy();
       expect(slot.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -319,8 +294,6 @@ describe('WeatherService.getBestTimes', () => {
   });
 
   it('ranks higher-scoring slots before lower-scoring ones on the same date', async () => {
-    // excellentSlot is given an earlier UTC time so after the final chronological
-    // sort (ascending by startHour) it still appears first in the results.
     const excellentSlot = {
       timestamp:     new Date('2026-03-01T04:00:00Z'), // ~09:30 local (startHour 9)
       temperature:   31,
@@ -344,13 +317,11 @@ describe('WeatherService.getBestTimes', () => {
     const localDate = '2026-03-01';
     const daySlots  = result.filter((s) => s.date === localDate);
 
-    // Both slots are daytime; after chronological sort excellent (hour 9) is first
     expect(daySlots.length).toBeGreaterThan(0);
     expect(daySlots[0].solarIndex).toBe('excellent');
   });
 });
 
-// ── getSolarHeatmap ────────────────────────────────────────────────────────────
 
 describe('WeatherService.getSolarHeatmap', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -408,7 +379,6 @@ describe('WeatherService.getSolarHeatmap', () => {
   });
 });
 
-// ── bulkRefresh ────────────────────────────────────────────────────────────────
 
 describe('WeatherService.bulkRefresh', () => {
   beforeEach(() => {
@@ -421,7 +391,6 @@ describe('WeatherService.bulkRefresh', () => {
     const id1 = new Types.ObjectId().toString();
     const id2 = new Types.ObjectId().toString();
 
-    // Mock getCurrentWeather: succeeds for id1, fails for id2
     jest.spyOn(WeatherService, 'getCurrentWeather')
       .mockResolvedValueOnce(mockWeatherData)
       .mockRejectedValueOnce(new Error('OWM timeout'));
@@ -451,21 +420,18 @@ describe('WeatherService.bulkRefresh', () => {
 
   it('skips warm-cached stations when force is false', async () => {
     const id = new Types.ObjectId().toString();
-    // Simulate an in-memory cache hit
     mockCacheGet.mockReturnValue(mockWeatherData);
 
     const refreshSpy = jest.spyOn(WeatherService, 'getCurrentWeather');
 
     const result = await WeatherService.bulkRefresh({ stationIds: [id], force: false });
 
-    // Station is warm — counted as refreshed but no API call made
     expect(result.refreshed).toBe(1);
     expect(result.failed).toBe(0);
     expect(refreshSpy).not.toHaveBeenCalled();
   });
 });
 
-// ── exportWeatherData ──────────────────────────────────────────────────────────
 
 describe('WeatherService.exportWeatherData', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -505,7 +471,6 @@ describe('WeatherService.exportWeatherData', () => {
 
     expect(result.contentType).toBe('text/csv');
     expect(result.filename).toMatch(/\.csv$/);
-    // CSV must start with the header row
     expect(result.data).toMatch(/^stationId,/);
   });
 
@@ -546,7 +511,6 @@ describe('WeatherService.exportWeatherData', () => {
   });
 });
 
-// ── Branch gap coverage ────────────────────────────────────────────────────────
 
 describe('WeatherService - branch coverage', () => {
   beforeEach(() => {
@@ -556,7 +520,6 @@ describe('WeatherService - branch coverage', () => {
     mockQuota.increment.mockResolvedValue(undefined);
   });
 
-  // Line 149 / 339 — early ObjectId guard in getCurrentWeather and getForecast
   it('throws 404 when stationId is not a valid ObjectId (getCurrentWeather)', async () => {
     mockCacheGet.mockReturnValue(undefined);
     mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
@@ -577,7 +540,6 @@ describe('WeatherService - branch coverage', () => {
     expect(mockStation.findById).not.toHaveBeenCalled();
   });
 
-  // deriveSolarIndex → 'excellent' (uvi >= 6 && clouds <= 20)
   it('returns solarIndex "excellent" when UV ≥ 6 and cloud cover ≤ 20%', async () => {
     const clearSky = { ...mockOWMCurrentResponse, uvi: 7.5, clouds: { all: 10 } };
     mockCacheGet.mockReturnValue(undefined);
@@ -592,7 +554,6 @@ describe('WeatherService - branch coverage', () => {
     expect(result.solarIndex).toBe('excellent');
   });
 
-  // deriveSolarIndex → 'moderate' (uvi >= 2 && clouds <= 60, not excellent/good)
   it('returns solarIndex "moderate" when UV is 3 and cloud cover is 50%', async () => {
     const partlyCloudy = { ...mockOWMCurrentResponse, uvi: 3, clouds: { all: 50 } };
     mockCacheGet.mockReturnValue(undefined);
@@ -607,9 +568,7 @@ describe('WeatherService - branch coverage', () => {
     expect(result.solarIndex).toBe('moderate');
   });
 
-  // buildWeatherData: raw.uvi absent → falls back to estimateUvIndex
   it('estimates UV index from cloud cover and time when OWM omits uvi', async () => {
-    // Deliberately omit the uvi field — OWM free tier often doesn't include it
     const { uvi: _omitted, ...noUvi } = mockOWMCurrentResponse;
     mockCacheGet.mockReturnValue(undefined);
     mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
@@ -624,7 +583,6 @@ describe('WeatherService - branch coverage', () => {
     expect(result.solarIndex).toBeTruthy();
   });
 
-  // deriveSolarIndex → 'unavailable' (uvi=0, clouds>=80)
   it('returns solarIndex "unavailable" when OWM reports UV=0 and cloud cover ≥ 80%', async () => {
     const overcastNight = {
       main:    { temp: 24.0, humidity: 92 },
@@ -647,7 +605,6 @@ describe('WeatherService - branch coverage', () => {
     expect(result.uvIndex).toBe(0);
   });
 
-  // Line 194 — fetchForecastFromOWM quota exhausted (getForecast path)
   it('throws when forecast quota is exhausted during getForecast', async () => {
     mockCacheGet.mockReturnValue(undefined);
     mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
@@ -661,14 +618,12 @@ describe('WeatherService - branch coverage', () => {
     expect(mockAxios.get).not.toHaveBeenCalled();
   });
 
-  // Line 319 — logger.warn catch block: forecast sub-fetch fails inside getCurrentWeather
   it('still returns current weather and logs a warning when forecast sub-fetch fails', async () => {
     mockCacheGet.mockReturnValue(undefined);
     mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
     mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
     mockCache.findOneAndUpdate.mockResolvedValue({} as never);
 
-    // First quota check (current) passes; second (forecast sub-fetch) fails → caught silently
     mockQuota.check
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(false);
@@ -678,11 +633,9 @@ describe('WeatherService - branch coverage', () => {
 
     expect(result.temperature).toBe(29.5);
     expect(result.solarIndex).toBeTruthy();
-    // persistToCache still called despite empty forecast array
     expect(mockCache.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 
-  // Lines 340-343 — getForecast DB warm-cache hit
   it('returns forecast from DB cache when in-memory is cold but DB entry is still valid', async () => {
     const cachedForecast = [
       { timestamp: new Date(), temperature: 27, cloudCover: 20, uvIndex: 5, solarIndex: 'good', precipitation: 0.5 },
@@ -706,14 +659,12 @@ describe('WeatherService - branch coverage', () => {
     expect(mockAxios.get).not.toHaveBeenCalled();
   });
 
-  // Lines 358 + 364 — getForecast: both forecast AND current fetches succeed → persistToCache
   it('persists both current and forecast when both OWM calls succeed inside getForecast', async () => {
     mockCacheGet.mockReturnValue(undefined);
     mockCache.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) } as never);
     mockStation.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(mockStationDoc) } as never);
     mockCache.findOneAndUpdate.mockResolvedValue({} as never);
 
-    // forecast fetch first, then current sub-fetch — both succeed
     mockAxios.get
       .mockResolvedValueOnce({ data: mockOWMForecastResponse } as never)
       .mockResolvedValueOnce({ data: mockOWMCurrentResponse } as never);
@@ -722,7 +673,6 @@ describe('WeatherService - branch coverage', () => {
 
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(8);
-    // persistToCache (findOneAndUpdate) must have been called since current was defined
     expect(mockCache.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 });

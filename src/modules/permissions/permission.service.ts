@@ -1,10 +1,4 @@
-/**
- * Permission service — RBAC/ABAC management layer.
- *
- * Ref: PROJECT_OVERVIEW.md → API Endpoints → Permissions (17 endpoints)
- *      MASTER_PROMPT.md → ACID — user_permission_override writes + audit_log in same session
- *      MASTER_PROMPT.md → SOLID OCP — extend PermissionEngine.handlers map, never modify existing
- */
+
 
 import mongoose from 'mongoose';
 import type {
@@ -45,8 +39,6 @@ async function runWithTransactionFallback<T>(
       });
       return result;
     } catch (error) {
-      // Local standalone Mongo instances reject transactions. Retry the same write path
-      // without a session so admin tooling still works in development.
       if (!isTransactionUnsupportedError(error)) {
         throw error;
       }
@@ -59,21 +51,19 @@ async function runWithTransactionFallback<T>(
 }
 
 class PermissionService {
-  // ─── Permissions catalog ────────────────────────────────────────────────
 
-  /** GET /admin/permissions */
+  
   async listPermissions(): Promise<IPermission[]> {
     return Permission.find().sort({ action: 1 }).lean() as unknown as IPermission[];
   }
 
-  // ─── Roles ───────────────────────────────────────────────────────────────
 
-  /** GET /admin/roles */
+  
   async listRoles(): Promise<IRole[]> {
     return Role.find().sort({ roleLevel: 1 }).lean() as unknown as IRole[];
   }
 
-  /** GET /admin/roles/:id/permissions */
+  
   async getRolePermissions(roleId: string): Promise<IRolePermission[]> {
     return RolePermission.find({ role: roleId })
       .populate('permission')
@@ -81,7 +71,7 @@ class PermissionService {
       .lean() as unknown as IRolePermission[];
   }
 
-  /** POST /admin/roles/:id/permissions */
+  
   async assignPermissionToRole(roleId: string, permissionId: string, policyIds: string[] = []): Promise<IRolePermission> {
     const [role, permission] = await Promise.all([
       Role.findById(roleId),
@@ -118,7 +108,7 @@ class PermissionService {
     return result;
   }
 
-  /** DELETE /admin/roles/:id/permissions/:permId */
+  
   async removePermissionFromRole(roleId: string, permissionId: string): Promise<void> {
     const rp = await RolePermission.findOne({ role: roleId, permission: permissionId });
     if (!rp) throw ApiError.notFound('Role-permission assignment not found');
@@ -136,25 +126,21 @@ class PermissionService {
     container.permissionEngine.flush();
   }
 
-  // ─── User overrides ──────────────────────────────────────────────────────
 
-  /** GET /admin/users/:id/permissions */
+  
   async getUserEffectivePermissions(userId: string): Promise<IPermission[]> {
     const user = await User.findById(userId).populate<{ role: IRole }>('role').lean();
     if (!user) throw ApiError.notFound('User not found');
 
-    // Base permissions from role
     const rolePerms = await RolePermission.find({ role: (user.role as IRole)._id })
       .populate<{ permission: IPermission }>('permission')
       .lean();
     const base = rolePerms.map(rp => rp.permission as IPermission);
 
-    // User-specific overrides
     const overrides = await UserPermissionOverride.find({ user: userId, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] })
       .populate<{ permission: IPermission }>('permission')
       .lean();
 
-    // Apply grants (add) and denies (remove)
     const result: Map<string, IPermission> = new Map(base.map(p => [p._id.toString(), p]));
     for (const ov of overrides) {
       const perm = ov.permission as unknown as IPermission;
@@ -165,7 +151,7 @@ class PermissionService {
     return Array.from(result.values());
   }
 
-  /** GET /admin/users/:id/permissions/matrix */
+  
   async getUserPermissionMatrix(userId: string): Promise<IUserPermissionMatrixItem[]> {
     const user = await User.findById(userId).populate<{ role: IRole }>('role').lean();
     if (!user) throw ApiError.notFound('User not found');
@@ -227,7 +213,7 @@ class PermissionService {
     });
   }
 
-  /** POST /admin/users/:id/permissions */
+  
   async overrideUserPermission(
     userId: string,
     permissionId: string,
@@ -277,7 +263,7 @@ class PermissionService {
     return override;
   }
 
-  /** DELETE /admin/users/:id/permissions/:permId */
+  
   async removeUserPermissionOverride(userId: string, permissionId: string, actorId: string): Promise<void> {
     const override = await UserPermissionOverride.findOne({ user: userId, permission: permissionId });
     if (!override) throw ApiError.notFound('Permission override not found');
@@ -309,9 +295,8 @@ class PermissionService {
     container.permissionEngine.flush(userId);
   }
 
-  // ─── Permission check ─────────────────────────────────────────────────────
 
-  /** POST /permissions/check */
+  
   async checkAccess(userId: string, action: string, context: Record<string, unknown> = {}): Promise<EvaluationResult> {
     const user = await User.findById(userId).populate<{ role: IRole }>('role').lean();
     if (!user) throw ApiError.notFound('User not found');
@@ -325,15 +310,12 @@ class PermissionService {
       isBanned:       user.isBanned,
     };
 
-    // context is passed by callers but the engine's resource param is a Document;
-    // for programmatic checks (no loaded resource), we pass undefined.
     void context;
     return container.permissionEngine.evaluate(userForPerm, action as import('@/types').PermissionAction);
   }
 
-  // ─── Audit logs ──────────────────────────────────────────────────────────
 
-  /** GET /admin/audit-logs */
+  
   async listAuditLogs(query: Record<string, unknown>): Promise<PaginationResult<IAuditLog>> {
     const page  = Number(query.page  ?? 1);
     const limit = Number(query.limit ?? 20);
@@ -357,9 +339,8 @@ class PermissionService {
     return { data: data as unknown as IAuditLog[], total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  // ─── Quota stats ─────────────────────────────────────────────────────────
 
-  /** GET /admin/quota */
+  
   async getQuotaStats(): Promise<Record<string, unknown>[]> {
     return container.quotaService.getStats();
   }

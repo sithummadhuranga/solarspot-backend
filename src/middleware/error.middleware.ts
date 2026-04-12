@@ -22,10 +22,7 @@ function getDuplicateKeyMessage(error: DuplicateKeyError): string {
   return 'A record with the same value already exists.';
 }
 
-/**
- * Global error-handling middleware.
- * Must be mounted LAST in app.ts after all routes.
- */
+
 export const errorHandler = (
   err: Error | ApiError,
   req: Request,
@@ -36,8 +33,6 @@ export const errorHandler = (
     stack: err.stack,
   });
 
-  // Malformed JSON body (thrown by express.json / body-parser)
-  // Typical shape: SyntaxError with `status` 400 and `type` = 'entity.parse.failed'
   const maybeParseErr = err as unknown as { status?: number; type?: string; message?: string };
   if (maybeParseErr?.status === 400 && maybeParseErr?.type === 'entity.parse.failed') {
     res.status(400).json({
@@ -69,7 +64,6 @@ export const errorHandler = (
     return;
   }
 
-  // Unhandled / generic errors — mask internals in production
   res.status(500).json({
     success:    false,
     message:    process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,

@@ -14,8 +14,6 @@ import logger from '@utils/logger';
 
 const app = express();
 
-// Running behind a reverse proxy (Render, Vercel rewrites, etc.)
-// Ensures `req.ip` and related security middleware behave correctly.
 if (config.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
@@ -30,12 +28,10 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      // In development, allow any localhost port (Vite, Swagger, etc.)
       if (config.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
         return callback(null, true);
       }
 
-      // In all envs, allow explicit allow-list origins
       const allowed = new Set(config.CORS_ORIGINS);
       if (allowed.has(origin)) return callback(null, true);
 
@@ -87,10 +83,8 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-// ─── Response compression ─────────────────────────────────────────────────────
 app.use(compression());
 
-// ─── Global rate limiter ───────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200,
@@ -101,7 +95,6 @@ const globalLimiter = rateLimit({
 });
 app.use('/api', globalLimiter);
 
-// ─── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
@@ -112,7 +105,6 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
-// ─── Swagger API docs ──────────────────────────────────────────────────────────
 if (config.NODE_ENV !== 'production') {
   app.use(
     '/api/docs',
@@ -139,7 +131,6 @@ app.get('/reset-password/:token', (req: Request, res: Response) => {
   return res.redirect(302, buildFrontendRedirectUrl(`/reset-password/${encodeURIComponent(String(req.params.token))}`));
 });
 
-// ─── Module routes ─────────────────────────────────────────────────────────────
 import authRouter        from '@modules/auth/auth.routes';
 import usersRouter       from '@modules/users/user.routes';
 import permissionsRouter from '@modules/permissions/permission.routes';
@@ -156,7 +147,6 @@ app.use('/api/weather',     weatherRouter);
 app.use('/api/solar',       solarRouter);
 app.use('/api/permissions', permissionsRouter);
 
-// ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
@@ -165,7 +155,6 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// ─── Global error handler (must be last) ───────────────────────────────────────
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   errorHandler(err, req, res, next);
 });

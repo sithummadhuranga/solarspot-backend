@@ -1,23 +1,15 @@
-/**
- * Station TypeScript interfaces.
- * Owner: Member 1
- * Ref: PROJECT_OVERVIEW.md → Database → stations collection
- */
+
 
 import { Document, Types } from 'mongoose';
 
-// ─── Station status ──────────────────────────────────────────────────────────
 export type StationStatus = 'pending' | 'active' | 'inactive' | 'rejected';
 
-// ─── Connector types ─────────────────────────────────────────────────────────
 export type ConnectorType = 'USB-C' | 'Type-2' | 'CCS' | 'CHAdeMO' | 'Tesla-NACS' | 'AC-Socket';
 
-// ─── Amenity values ──────────────────────────────────────────────────────────
 export type AmenityValue =
   | 'wifi' | 'cafe' | 'restroom' | 'parking' | 'security'
   | 'shade' | 'water' | 'repair_shop' | 'ev_parking';
 
-// ─── Sub-document interfaces ─────────────────────────────────────────────────
 export interface IConnector {
   type: ConnectorType;
   powerKw: number;
@@ -49,7 +41,6 @@ export interface IGeoPoint {
   coordinates: [number, number]; // [lng, lat]
 }
 
-// ─── Station document ────────────────────────────────────────────────────────
 export interface IStation extends Document {
   _id: Types.ObjectId;
   name: string;
@@ -78,7 +69,6 @@ export interface IStation extends Document {
   updatedAt: Date;
 }
 
-// ─── DTOs ───────────────────────────────────────────────────────────────────
 export interface CreateStationInput {
   name: string;
   description?: string;
@@ -119,4 +109,3 @@ export interface ListStationsQuery {
   sortBy?: 'newest' | 'rating' | 'distance' | 'featured';
 }
 
-// PaginationResult is defined in common.types.ts — do not duplicate here

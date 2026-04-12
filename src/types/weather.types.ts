@@ -1,14 +1,7 @@
-/**
- * Weather / Solar Intelligence TypeScript interfaces.
- * Owner: Member 3 — implement in weather module.
- * Ref: PROJECT_OVERVIEW.md → Modules → weather
- *      PROJECT_OVERVIEW.md → API Endpoints → Weather (6 endpoints)
- */
 
-// ─── Solar irradiance index ──────────────────────────────────────────────────
+
 export type SolarIndex = 'excellent' | 'good' | 'moderate' | 'poor' | 'unavailable';
 
-// ─── Current weather data for a station ─────────────────────────────────────
 export interface WeatherData {
   stationId: string;
   fetchedAt: Date;
@@ -21,11 +14,9 @@ export interface WeatherData {
   description: string;       // e.g. "clear sky"
   icon: string;              // OpenWeatherMap icon code
   windSpeed: number;         // m/s
-  // Raw provider response (stored for debugging, not exposed to clients)
   _raw?: Record<string, unknown>;
 }
 
-// ─── A single slot in the 5-day forecast ────────────────────────────────────
 export interface ForecastSlot {
   timestamp: Date;
   temperature: number;
@@ -35,7 +26,6 @@ export interface ForecastSlot {
   precipitation: number;    // mm
 }
 
-// ─── Best charging time recommendation ──────────────────────────────────────
 export interface BestTimeSlot {
   date: string;             // ISO date string
   startHour: number;        // e.g. 10 (10:00)
@@ -44,7 +34,6 @@ export interface BestTimeSlot {
   reason: string;           // human-readable explanation
 }
 
-// ─── Heatmap data point ─────────────────────────────────────────────────────
 export interface HeatmapPoint {
   stationId: string;
   lat: number;
@@ -54,7 +43,6 @@ export interface HeatmapPoint {
   cloudCover: number;
 }
 
-// ─── DTOs ───────────────────────────────────────────────────────────────────
 export interface BulkRefreshInput {
   stationIds?: string[];  // if omitted, refreshes all approved stations
   force?: boolean;         // bypass cache TTL

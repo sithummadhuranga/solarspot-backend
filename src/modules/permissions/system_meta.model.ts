@@ -1,9 +1,4 @@
-/**
- * SystemMeta model — singleton document storing system-wide metadata.
- *
- * Ref: PROJECT_OVERVIEW.md → Data Models → SystemMeta
- *      src/seed/00_system_meta.ts — seeded on first run
- */
+
 
 import { Schema, model, Document } from 'mongoose';
 

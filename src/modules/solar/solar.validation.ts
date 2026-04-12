@@ -1,19 +1,10 @@
-/**
- * Solar module — Joi request validation schemas.
- *
- * All schemas use stripUnknown: true (enforced by the validate middleware).
- * Each schema validates the minimum required for the endpoint to function safely.
- *
- * Owner: Member 3 · Ref: SolarIntelligence_Module_Prompt.md → A4
- */
+
 
 import Joi from 'joi';
 
-// ── Reusable fragments ────────────────────────────────────────────────────────
 
 const mongoId = Joi.string().hex().length(24);
 
-// ── Schemas ───────────────────────────────────────────────────────────────────
 
 export const stationIdParamSchema = Joi.object({
   stationId: mongoId.required().messages({
