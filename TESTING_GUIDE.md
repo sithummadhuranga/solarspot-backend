@@ -15,7 +15,8 @@ This guide covers how to test SolarSpot Backend before submission.
 
 - Node.js 20+
 - Dependencies installed (`npm ci`)
-- For integration tests, ensure MongoDB test dependencies are available
+- No external MongoDB is required for integration tests; they run with `mongodb-memory-server`.
+- Ensure your machine can download/run `mongodb-memory-server` binaries on first run.
 
 Install and prepare:
 

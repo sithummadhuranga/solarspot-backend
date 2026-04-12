@@ -22,10 +22,9 @@ If Docker is used locally:
 
 ```bash
 docker-compose up -d --build
-curl http://localhost:5001/api/health
+curl http://localhost:5000/api/health
 ```
 
-Note: In this repository, Docker maps host port `5001` to container port `5000`.
 
 ## 3. Required Environment Variables
 
@@ -35,7 +34,6 @@ Set these at minimum in your deployment environment:
 - `PORT=5000`
 - `MONGODB_URI`
 - `JWT_SECRET`
-- `JWT_REFRESH_SECRET`
 - `COOKIE_SECRET`
 - `FRONTEND_URL`
 - `APP_URL`
@@ -84,7 +82,7 @@ docker-compose up -d --build
 
 3. Verify services:
 
-- API: `http://localhost:5001/api/health`
+- API: `http://localhost:5000/api/health`
 - Mongo Express: `http://localhost:8081`
 
 4. Seed demo data (optional for demo):
