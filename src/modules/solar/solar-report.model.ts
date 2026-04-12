@@ -1,8 +1,4 @@
-/**
- * SolarReport model — crowdsourced solar output observations per station visit.
- *
- * Ref: SolarIntelligence_Module_Prompt.md → A1
- */
+
 
 import { Schema, model, Types } from 'mongoose';
 

@@ -1,9 +1,4 @@
-/**
- * Policy model — ABAC policy documents (13 policies).
- *
- * Ref: PROJECT_OVERVIEW.md → RBAC → Policies (13 defined)
- *      MASTER_PROMPT.md → OCP — add new policy by registering ConditionHandler in PermissionEngine
- */
+
 
 import { Schema, model } from 'mongoose';
 import type { IPolicy } from '@/types';
@@ -39,7 +34,6 @@ const policySchema = new Schema<IPolicy>(
   { timestamps: true },
 );
 
-// slug index already created by `unique: true` on the field — only add non-duplicate indexes
 policySchema.index({ condition: 1 });
 
 export const Policy = model<IPolicy>('Policy', policySchema);

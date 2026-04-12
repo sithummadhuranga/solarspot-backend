@@ -1,13 +1,4 @@
-/**
- * Seeder 02 — policies
- *
- * Owner: Member 4
- * Seeds all 13 built-in policy documents.
- *
- * Ref: PROJECT_OVERVIEW.md → Policies — 13 Built-in
- *
- * Data is additive (upsert by slug) — safe to re-run.
- */
+
 
 import { ClientSession } from 'mongoose';
 import { PolicyCondition } from '@/types';
@@ -23,8 +14,6 @@ interface PolicySeed {
   isSystem: boolean;
 }
 
-// ─── Seed data — 13 policies ─────────────────────────────────────────────────
-// Ref: PROJECT_OVERVIEW.md → Policies — 13 Built-in
 export const POLICIES_SEED: PolicySeed[] = [
   { name: 'Email Verified Only',         slug: 'email_verified_only',     condition: 'email_verified',   effect: 'allow', isSystem: true },
   { name: 'Active Account Only',         slug: 'active_account_only',     condition: 'account_active',   effect: 'allow', isSystem: true },

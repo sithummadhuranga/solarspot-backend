@@ -1,10 +1,4 @@
-/**
- * User service — business logic layer for user management.
- *
- * Ref: PROJECT_OVERVIEW.md → API Endpoints → Users (6 endpoints)
- *      MASTER_PROMPT.md → Controller → Service → Model (strict layering)
- *      MASTER_PROMPT.md → ACID — use mongoose sessions for multi-doc writes
- */
+
 
 import mongoose from 'mongoose';
 import { User } from './user.model';
@@ -19,14 +13,14 @@ import type {
 } from '@/types';
 
 class UserService {
-  /** GET /users/me — return the authenticated user's profile. */
+  
   async getMe(userId: string): Promise<IUser> {
     const user = await User.findById(userId).populate('role').lean();
     if (!user) throw ApiError.notFound('User not found');
     return user as IUser;
   }
 
-  /** PUT /users/me — update own profile. */
+  
   async updateMe(userId: string, input: UpdateProfileInput): Promise<IUser> {
     const user = await User.findByIdAndUpdate(
       userId,
@@ -38,7 +32,7 @@ class UserService {
     return user as IUser;
   }
 
-  /** DELETE /users/me — soft-delete own account. */
+  
   async deleteMe(userId: string): Promise<void> {
     const session = await mongoose.startSession();
 
@@ -63,7 +57,7 @@ class UserService {
     }
   }
 
-  /** GET /users — paginated list of all users. */
+  
   async listUsers(query: Record<string, unknown>): Promise<PaginationResult<IUser>> {
     const page = Math.max(1, Number(query.page ?? 1));
     const limit = Math.min(50, Math.max(1, Number(query.limit ?? 20)));
@@ -87,14 +81,14 @@ class UserService {
     return { data: data as IUser[], total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  /** GET /users/:id — get any user by ID. */
+  
   async getUserById(id: string): Promise<IUser> {
     const user = await User.findOne({ _id: id, isActive: true }).populate('role').lean();
     if (!user) throw ApiError.notFound('User not found');
     return user as IUser;
   }
 
-  /** PUT /users/:id — admin update (role, isActive, isBanned). */
+  
   async adminUpdateUser(
     targetId: string,
     input: AdminUpdateUserInput,
@@ -138,7 +132,6 @@ class UserService {
           { session },
         );
       });
-      // Read after commit so the updated fields are visible outside the transaction.
       updated = await User.findById(targetId).populate('role').lean() as IUser;
     } finally {
       await session.endSession();

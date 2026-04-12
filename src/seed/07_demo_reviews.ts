@@ -1,14 +1,4 @@
-/**
- * Seeder 07 — demo_reviews
- *
- * Owner: Member 2
- * Owner: Member 4 — runs this as part of the seed pipeline.
- *
- * Seeds sample reviews against demo stations.
- * Depends on: 05_demo_users, 06_demo_stations
- *
- * ⚠️  DEV ONLY — never run seed:demo in production.
- */
+
 
 import { ClientSession, Types } from 'mongoose';
 import { Review } from '@modules/reviews/review.model';
@@ -103,13 +93,11 @@ export const DEMO_REVIEWS: DemoReviewSeed[] = [
 ];
 
 export async function seedDemoReviews(session: ClientSession): Promise<void> {
-  // Resolve user emails to ObjectIds
   const users = await User.find({ email: { $in: DEMO_REVIEWS.map((r) => r.authorEmail) } })
     .select('_id email')
     .lean();
   const userMap = new Map(users.map((u) => [u.email, u._id as Types.ObjectId]));
 
-  // Resolve station names to ObjectIds
   const stationNames = [...new Set(DEMO_REVIEWS.map((r) => r.stationName))];
   const stations = await Station.find({ name: { $in: stationNames } })
     .select('_id name')
@@ -148,7 +136,6 @@ export async function seedDemoReviews(session: ClientSession): Promise<void> {
     seeded++;
   }
 
-  // Recalculate averageRating for all stations that received reviews
   for (const [, stationId] of stationMap) {
     const [agg] = await Review.aggregate([
       { $match: { station: stationId, moderationStatus: 'approved', isActive: true } },

@@ -24,9 +24,6 @@ const logger = winston.createLogger({
   format: process.env.NODE_ENV === 'production' ? prodFormat : devFormat,
   transports: [
     new winston.transports.Console(),
-    // TODO: add File transport for production logs if needed
-    // new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    // new winston.transports.File({ filename: 'logs/combined.log' }),
   ],
 });
 

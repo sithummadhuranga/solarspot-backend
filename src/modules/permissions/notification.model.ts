@@ -1,8 +1,4 @@
-/**
- * Notification model — in-app notification documents.
- *
- * Ref: PROJECT_OVERVIEW.md → Data Models → Notification
- */
+
 
 import { Schema, model, Document, Types } from 'mongoose';
 

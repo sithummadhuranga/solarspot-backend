@@ -1,7 +1,4 @@
-/**
- * Unit tests — PermissionService
- * Ref: MASTER_PROMPT.md → Testing → PermissionEngine isolated, mock DB calls
- */
+
 
 import { Types } from 'mongoose';
 
@@ -10,7 +7,6 @@ const mockSession = {
   endSession: jest.fn().mockResolvedValue(undefined),
 };
 
-// ─── Mocks ───────────────────────────────────────────────────────────────────
 
 jest.mock('@modules/permissions/permission.model', () => ({
   Permission: { find: jest.fn(), findById: jest.fn() },
@@ -61,7 +57,6 @@ const USER_ID   = new Types.ObjectId();
 
 beforeEach(() => jest.clearAllMocks());
 
-// ─── listPermissions ──────────────────────────────────────────────────────────
 
 describe('PermissionService.listPermissions', () => {
   it('should return permissions sorted by action', async () => {
@@ -75,7 +70,6 @@ describe('PermissionService.listPermissions', () => {
   });
 });
 
-// ─── listRoles ────────────────────────────────────────────────────────────────
 
 describe('PermissionService.listRoles', () => {
   it('should return roles sorted by roleLevel', async () => {
@@ -88,7 +82,6 @@ describe('PermissionService.listRoles', () => {
   });
 });
 
-// ─── assignPermissionToRole ───────────────────────────────────────────────────
 
 describe('PermissionService.assignPermissionToRole', () => {
   it('should create a RolePermission document', async () => {
@@ -96,7 +89,6 @@ describe('PermissionService.assignPermissionToRole', () => {
     (mockPermission.findById as jest.Mock).mockResolvedValue({ _id: PERM_ID } as never);
 
     const created = { _id: new Types.ObjectId(), role: ROLE_ID, permission: PERM_ID, policies: [] };
-    // findOne inside transaction returns null (no existing) → triggers create path
     (mockRolePerm.findOne as jest.Mock).mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
     (mockRolePerm.create as jest.Mock).mockResolvedValue([created]);
     (mockRolePerm.findOne as jest.Mock)
@@ -127,14 +119,11 @@ describe('PermissionService.assignPermissionToRole', () => {
   });
 });
 
-// ─── removePermissionFromRole ─────────────────────────────────────────────────
 
 describe('PermissionService.removePermissionFromRole', () => {
   it('should delete the RolePermission document', async () => {
     const rpDoc = { _id: new Types.ObjectId(), role: ROLE_ID, permission: PERM_ID };
-    // First findOne call (outside transaction — check existence)
     (mockRolePerm.findOne as jest.Mock).mockResolvedValue(rpDoc as never);
-    // deleteOne inside transaction needs .session() chain
     (mockRolePerm.deleteOne as jest.Mock).mockReturnValue({ session: jest.fn().mockResolvedValue({ deletedCount: 1 }) });
 
     await expect(
@@ -143,7 +132,6 @@ describe('PermissionService.removePermissionFromRole', () => {
   });
 });
 
-// ─── overrideUserPermission ───────────────────────────────────────────────────
 
 describe('PermissionService.overrideUserPermission', () => {
   it('should upsert override and write audit log', async () => {
@@ -195,7 +183,6 @@ describe('PermissionService.overrideUserPermission', () => {
   });
 });
 
-// ─── getUserPermissionMatrix ─────────────────────────────────────────────────
 
 describe('PermissionService.getUserPermissionMatrix', () => {
   it('should return inherited and override-based permission states', async () => {
@@ -241,7 +228,6 @@ describe('PermissionService.getUserPermissionMatrix', () => {
   });
 });
 
-// ─── checkAccess ──────────────────────────────────────────────────────────────
 
 describe('PermissionService.checkAccess', () => {
   it('should delegate to PermissionEngine and return result', async () => {
@@ -261,7 +247,6 @@ describe('PermissionService.checkAccess', () => {
   });
 });
 
-// ─── listAuditLogs ────────────────────────────────────────────────────────────
 
 describe('PermissionService.listAuditLogs', () => {
   it('should return paginated audit logs', async () => {

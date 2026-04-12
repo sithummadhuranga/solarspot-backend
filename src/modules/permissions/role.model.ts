@@ -1,8 +1,4 @@
-/**
- * Role model — one document per role slug (10 roles).
- *
- * Ref: PROJECT_OVERVIEW.md → RBAC → Roles (10 defined)
- */
+
 
 import { Schema, model } from 'mongoose';
 import type { IRole } from '@/types';

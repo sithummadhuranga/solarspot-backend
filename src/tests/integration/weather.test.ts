@@ -1,17 +1,4 @@
-/**
- * Integration tests — Weather endpoints
- *
- * WeatherService is mocked at the module level because Member 1's Station model
- * hasn't been implemented yet (all schema fields are commented out in station.model.ts).
- * This lets us fully exercise the HTTP layer — routing, auth middleware, RBAC
- * middleware, request validation, and response shape — without depending on
- * Member 1's model being ready.
- *
- * When Member 1 ships the Station model, remove the WeatherService mock and add
- * real station documents to the DB to make these end-to-end.
- *
- * Owner: Member 3 · Ref: MASTER_PROMPT.md → Testing
- */
+
 
 import request   from 'supertest';
 import jwt        from 'jsonwebtoken';
@@ -21,7 +8,6 @@ import { connectTestDb, disconnectTestDb, seedCore } from './helpers';
 import { User }   from '@modules/users/user.model';
 import { Role }   from '@modules/permissions/role.model';
 
-// ── Mock WeatherService (isolate from Station model dependency) ───────────────
 
 jest.mock('@modules/weather/weather.service', () => ({
   __esModule: true,
@@ -39,7 +25,6 @@ import WeatherService from '@modules/weather/weather.service';
 
 const mockSvc = WeatherService as jest.Mocked<typeof WeatherService>;
 
-// ── Test fixtures ─────────────────────────────────────────────────────────────
 
 const stationId = new Types.ObjectId().toString();
 
@@ -80,12 +65,10 @@ const mockHeatmap = [
   { stationId, lat: 7.8, lng: 80.7, solarIndex: 'good', uvIndex: 4, cloudCover: 30 },
 ];
 
-// ── Shared state ──────────────────────────────────────────────────────────────
 
 let adminToken:   string;
 let regularToken: string;
 
-// ── Setup / teardown ──────────────────────────────────────────────────────────
 
 beforeAll(async () => {
   await connectTestDb();
@@ -93,7 +76,6 @@ beforeAll(async () => {
 
   const jwtSecret = process.env.JWT_SECRET!;
 
-  // Create an admin user so we can test RBAC-gated endpoints
   const adminRole   = await Role.findOne({ name: 'admin' }).lean();
   const userRole    = await Role.findOne({ name: 'user' }).lean();
 
@@ -121,9 +103,6 @@ beforeAll(async () => {
     isBanned:        false,
   });
 
-  // Sign JWTs with the full payload the protect + checkPermission middlewares expect.
-  // Include roleLevel explicitly: admin=4 (triggers admin bypass in PermissionEngine),
-  // regular user=1 (falls through to role-based permission check → denied).
   adminToken = jwt.sign(
     {
       _id:             (adminUser._id as import('mongoose').Types.ObjectId).toString(),
@@ -159,7 +138,6 @@ afterAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Default: services return correct data
   mockSvc.getCurrentWeather.mockResolvedValue(mockWeatherData as never);
   mockSvc.getForecast.mockResolvedValue(mockForecast as never);
   mockSvc.getBestTimes.mockResolvedValue(mockBestTimes as never);
@@ -172,7 +150,6 @@ beforeEach(() => {
   });
 });
 
-// ── GET /api/weather/heatmap ───────────────────────────────────────────────────
 
 describe('GET /api/weather/heatmap', () => {
   it('200 — returns heatmap array without authentication', async () => {
@@ -194,7 +171,6 @@ describe('GET /api/weather/heatmap', () => {
   });
 });
 
-// ── GET /api/weather/:stationId ───────────────────────────────────────────────
 
 describe('GET /api/weather/:stationId', () => {
   it('200 — returns current weather without authentication', async () => {
@@ -224,7 +200,6 @@ describe('GET /api/weather/:stationId', () => {
   });
 });
 
-// ── GET /api/weather/:stationId/forecast ─────────────────────────────────────
 
 describe('GET /api/weather/:stationId/forecast', () => {
   it('200 — returns forecast array without authentication', async () => {
@@ -243,7 +218,6 @@ describe('GET /api/weather/:stationId/forecast', () => {
   });
 });
 
-// ── GET /api/weather/best-time/:stationId ─────────────────────────────────────
 
 describe('GET /api/weather/best-time/:stationId', () => {
   it('200 — returns best-time slots without authentication', async () => {
@@ -267,7 +241,6 @@ describe('GET /api/weather/best-time/:stationId', () => {
   });
 });
 
-// ── POST /api/weather/bulk-refresh ────────────────────────────────────────────
 
 describe('POST /api/weather/bulk-refresh', () => {
   it('401 — rejects request without a bearer token', async () => {
@@ -323,7 +296,6 @@ describe('POST /api/weather/bulk-refresh', () => {
   });
 });
 
-// ── GET /api/weather/export ────────────────────────────────────────────────────
 
 describe('GET /api/weather/export', () => {
   it('401 — rejects request without a bearer token', async () => {

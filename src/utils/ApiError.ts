@@ -1,7 +1,4 @@
-/**
- * ApiError — standardised operational error class.
- * All thrown errors in controllers/services should use this.
- */
+
 class ApiError extends Error {
   public statusCode: number;
   public errors: string[];

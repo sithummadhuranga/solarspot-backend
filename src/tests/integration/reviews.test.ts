@@ -1,18 +1,4 @@
-/**
- * Integration tests — Review endpoints
- * Owner: Member 2
- *
- * Pattern mirrors stations.test.ts — MongoMemoryServer, supertest, JWT helpers.
- *
- * RBAC note: PermissionEngine.evaluate() is spied to return { allowed: true }
- * because the auth middleware provides role as a string ('user', 'moderator')
- * while the permission engine queries role_permissions by ObjectId reference.
- * Business-logic auth (ownership, self-vote, self-flag) lives in the SERVICE
- * layer and is fully exercised by these tests.
- *
- * Toxicity detection: uses the built-in local regex scorer (zero-cost, no network).
- * Clean test content scores 0 → approved by default in all create-review tests.
- */
+
 
 import request from 'supertest';
 import mongoose, { Types } from 'mongoose';
@@ -26,7 +12,7 @@ import { Review }  from '@modules/reviews/review.model';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
-/* ── Identities ─────────────────────────────────────────────────────────────── */
+
 const USER_A_ID     = new Types.ObjectId();   // regular user — will create reviews
 const USER_B_ID     = new Types.ObjectId();   // another regular user
 const STATION_OWNER = new Types.ObjectId();   // owns the test station
@@ -53,21 +39,18 @@ let reviewForFlag:  string;      // review by USER_B — will be flagged
 let reviewForMod:   string;      // review by USER_A — for moderation (approve then reject)
 let reviewForDeleteTest: string; // review by USER_A on a separate station — only used for 403 delete test
 
-/* ── Before / After ─────────────────────────────────────────────────────────── */
+
 
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongoServer.getUri();
   await mongoose.connect(mongoServer.getUri(), { dbName: 'solarspot_review_test' });
 
-  // Bypass RBAC permission engine — business-logic checks in service layer still apply
   jest.spyOn(container.permissionEngine, 'evaluate').mockResolvedValue({ allowed: true });
 
-  // Build indexes
   await Station.init();
   await Review.init();
 
-  // Create a station (active, approved) owned by STATION_OWNER
   const station = await Station.create({
     name:        'Test Solar Station',
     description: 'Integration test station',
@@ -81,7 +64,6 @@ beforeAll(async () => {
   });
   stationId = station._id.toString();
 
-  // Seed a review by USER_B for deletion test
   const rDel = await Review.create({
     station: station._id,
     author:  USER_B_ID,
@@ -93,7 +75,6 @@ beforeAll(async () => {
   });
   reviewForDelete = rDel._id.toString();
 
-  // Need a second station so USER_B can have another review for flag testing
   const station2 = await Station.create({
     name:        'Test Station Two',
     submittedBy: STATION_OWNER,
@@ -114,9 +95,6 @@ beforeAll(async () => {
   });
   reviewForFlag = rFlagDoc._id.toString();
 
-  // A third station + review by USER_A — kept permanently active so the
-  // "403 — non-owner cannot delete" test always finds an active document,
-  // regardless of what moderationStatus is applied to reviewForMod.
   const station4 = await Station.create({
     name:        'Delete Permission Test Station',
     submittedBy: STATION_OWNER,
@@ -143,7 +121,7 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
-/* ── POST /api/reviews ──────────────────────────────────────────────────────── */
+
 
 describe('POST /api/reviews', () => {
   const validBody = {
@@ -233,7 +211,6 @@ describe('POST /api/reviews', () => {
   });
 
   it('creates a review by USER_A for moderation test (setup)', async () => {
-    // Need a third station for this review
     const station3 = await Station.create({
       name: 'Station For Moderation',
       submittedBy: STATION_OWNER,
@@ -258,7 +235,7 @@ describe('POST /api/reviews', () => {
   });
 });
 
-/* ── GET /api/reviews ───────────────────────────────────────────────────────── */
+
 
 describe('GET /api/reviews', () => {
   it('200 — returns paginated reviews', async () => {
@@ -282,9 +259,6 @@ describe('GET /api/reviews', () => {
   });
 
   it('200 — filters by authorId returns only that user\'s reviews', async () => {
-    // First get the unfiltered total, then compare with U SER_A-only total.
-    // We can't inspect review.author._id because User documents are not seeded in
-    // this test DB — populate returns null. Instead we verify the count is smaller.
     const [allRes, filteredRes] = await Promise.all([
       request(app).get('/api/reviews'),
       request(app).get(`/api/reviews?authorId=${USER_A_ID.toString()}`),
@@ -293,7 +267,6 @@ describe('GET /api/reviews', () => {
     expect(filteredRes.status).toBe(200);
     expect(Array.isArray(filteredRes.body.data)).toBe(true);
     expect(filteredRes.body.data.length).toBeGreaterThan(0);
-    // USER_B also has reviews on other stations, so filtering must reduce total count
     expect(filteredRes.body.pagination.total).toBeLessThan(allRes.body.pagination.total);
   });
 
@@ -312,7 +285,7 @@ describe('GET /api/reviews', () => {
   });
 });
 
-/* ── GET /api/reviews/:id ───────────────────────────────────────────────────── */
+
 
 describe('GET /api/reviews/:id', () => {
   it('200 — returns the review document', async () => {
@@ -337,7 +310,7 @@ describe('GET /api/reviews/:id', () => {
   });
 });
 
-/* ── PUT /api/reviews/:id ───────────────────────────────────────────────────── */
+
 
 describe('PUT /api/reviews/:id', () => {
   it('200 — author can update rating and title', async () => {
@@ -388,7 +361,7 @@ describe('PUT /api/reviews/:id', () => {
   });
 });
 
-/* ── POST /api/reviews/:id/helpful ──────────────────────────────────────────── */
+
 
 describe('POST /api/reviews/:id/helpful', () => {
   it('200 — adds helpful vote', async () => {
@@ -434,7 +407,7 @@ describe('POST /api/reviews/:id/helpful', () => {
   });
 });
 
-/* ── POST /api/reviews/:id/flag ─────────────────────────────────────────────── */
+
 
 describe('POST /api/reviews/:id/flag', () => {
   it('200 — flags a review', async () => {
@@ -482,7 +455,7 @@ describe('POST /api/reviews/:id/flag', () => {
   });
 });
 
-/* ── GET /api/reviews/flagged ───────────────────────────────────────────────── */
+
 
 describe('GET /api/reviews/flagged', () => {
   it('200 — authenticated user can list flagged reviews', async () => {
@@ -503,7 +476,7 @@ describe('GET /api/reviews/flagged', () => {
   });
 });
 
-/* ── PATCH /api/reviews/:id/moderate ────────────────────────────────────────── */
+
 
 describe('PATCH /api/reviews/:id/moderate', () => {
   it('200 — moderator can approve a review', async () => {
@@ -554,7 +527,7 @@ describe('PATCH /api/reviews/:id/moderate', () => {
   });
 });
 
-/* ── DELETE /api/reviews/:id ────────────────────────────────────────────────── */
+
 
 describe('DELETE /api/reviews/:id', () => {
   it('204 — author can soft-delete own review', async () => {
@@ -564,27 +537,22 @@ describe('DELETE /api/reviews/:id', () => {
 
     expect(res.status).toBe(204);
 
-    // Confirm subsequent GET returns 404
     const getRes = await request(app).get(`/api/reviews/${reviewForDelete}`);
     expect(getRes.status).toBe(404);
   });
 
   it('204 — moderator can delete any review (canDeleteAny)', async () => {
-    // reviewAId belongs to USER_A; modToken is a moderator (roleLevel 3)
     const res = await request(app)
       .delete(`/api/reviews/${reviewAId}`)
       .set('Authorization', modToken);
 
     expect(res.status).toBe(204);
 
-    // Verify the review is now gone
     const getRes = await request(app).get(`/api/reviews/${reviewAId}`);
     expect(getRes.status).toBe(404);
   });
 
   it('403 — non-owner cannot delete', async () => {
-    // reviewForDeleteTest belongs to USER_A; userBToken is a different regular user.
-    // This review is never rejected/moderated so it stays isActive:true for this test.
     const res = await request(app)
       .delete(`/api/reviews/${reviewForDeleteTest}`)
       .set('Authorization', userBToken);
@@ -609,23 +577,13 @@ describe('DELETE /api/reviews/:id', () => {
   });
 });
 
-/* ── Pending review — full moderation flow ──────────────────────────────────── */
 
-/**
- * These tests exercise the full lifecycle of a review that the AI toxicity
- * screener holds for human review (moderationStatus: 'pending').
- *
- * Content that reliably scores 0.75 via the local regex scorer:
- *   "kys fucking useless" → 0.50 (kys) + 0.25 (fucking) = 0.75 → pending
- *
- * Content that scores 0.80+ (auto-reject):
- *   "i will kill you right now" → THREAT_PATTERNS → +0.80 → rejected
- */
+
+
 describe('Pending review — full moderation flow', () => {
   let pendingReviewId: string;
   let stationForPendingTests: string;
 
-  // Create a dedicated station so pending-test reviews don't clash with earlier ones
   beforeAll(async () => {
     const station = await Station.create({
       name:        'Pending Test Station',
@@ -642,7 +600,6 @@ describe('Pending review — full moderation flow', () => {
   });
 
   it('201 — borderline-toxic content produces moderationStatus=pending', async () => {
-    // "kys fucking useless" → local scorer: 0.50 (kys) + 0.25 (fucking) = 0.75 → pending
     const res = await request(app)
       .post('/api/reviews')
       .set('Authorization', userAToken)
@@ -655,7 +612,6 @@ describe('Pending review — full moderation flow', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.moderationStatus).toBe('pending');
-    // isActive stays true for pending (only rejected gets isActive: false)
     expect(res.body.data.isActive).toBe(true);
 
     pendingReviewId = res.body.data._id;
@@ -666,7 +622,6 @@ describe('Pending review — full moderation flow', () => {
       .get(`/api/reviews?stationId=${stationForPendingTests}`);
 
     expect(res.status).toBe(200);
-    // Default public listing only shows 'approved' reviews
     const ids = (res.body.data as Array<{ _id: string }>).map((r) => r._id);
     expect(ids).not.toContain(pendingReviewId);
   });
@@ -688,10 +643,8 @@ describe('Pending review — full moderation flow', () => {
 
     expect(approveRes.status).toBe(200);
     expect(approveRes.body.data.moderationStatus).toBe('approved');
-    // Approve clears flag state
     expect(approveRes.body.data.isFlagged).toBe(false);
 
-    // Verify: public listing now includes this review
     const listRes = await request(app)
       .get(`/api/reviews?stationId=${stationForPendingTests}`);
 
@@ -708,10 +661,8 @@ describe('Pending review — full moderation flow', () => {
 
     expect(rejectRes.status).toBe(200);
     expect(rejectRes.body.data.moderationStatus).toBe('rejected');
-    // Reject makes the review inactive
     expect(rejectRes.body.data.isActive).toBe(false);
 
-    // Verify: public listing no longer includes this review
     const listRes = await request(app)
       .get(`/api/reviews?stationId=${stationForPendingTests}`);
 
@@ -721,7 +672,6 @@ describe('Pending review — full moderation flow', () => {
   });
 
   it('200 — after rejection author can submit a new corrected review (compound unique lifted)', async () => {
-    // The rejected review has isActive:false so the partial unique index allows re-submission
     const res = await request(app)
       .post('/api/reviews')
       .set('Authorization', userAToken)
@@ -732,13 +682,12 @@ describe('Pending review — full moderation flow', () => {
         content: 'Actually a decent station once you get past the poor signage.',
       });
 
-    // Clean content → auto-approved
     expect(res.status).toBe(201);
     expect(res.body.data.moderationStatus).toBe('approved');
   });
 });
 
-/* ── Auto-reject — severe toxic content ─────────────────────────────────────── */
+
 
 describe('Auto-reject — severely toxic content at creation', () => {
   let autoRejectStationId: string;
@@ -756,7 +705,6 @@ describe('Auto-reject — severely toxic content at creation', () => {
   });
 
   it('201 — content with threat triggers auto-reject; review stored as isActive:false', async () => {
-    // THREAT_PATTERNS → +0.80 → moderationStatus:'rejected', isActive:false
     const res = await request(app)
       .post('/api/reviews')
       .set('Authorization', userBToken)
@@ -790,12 +738,11 @@ describe('Auto-reject — severely toxic content at creation', () => {
       .get(`/api/reviews?stationId=${autoRejectStationId}&moderationStatus=rejected`);
 
     expect(res.status).toBe(200);
-    // The rejected review exists in DB but with isActive:false → listReviews filter isActive:true hides it
     expect(res.body.data).toHaveLength(0);
   });
 });
 
-/* ── Community flag auto-escalation ─────────────────────────────────────────── */
+
 
 describe('Community flag — auto-escalation to flagged status', () => {
   let escalateReviewId: string;
@@ -856,7 +803,6 @@ describe('Community flag — auto-escalation to flagged status', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.flagCount).toBe(3);
-    // Auto-escalation triggers at FLAG_AUTO_ESCALATE_THRESHOLD (3)
     expect(res.body.data.escalated).toBe(true);
   });
 
@@ -878,11 +824,9 @@ describe('Community flag — auto-escalation to flagged status', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.moderationStatus).toBe('approved');
-    // Flag state is cleared on approval
     expect(res.body.data.isFlagged).toBe(false);
     expect(res.body.data.flagCount).toBe(0);
 
-    // Verify it no longer appears in the flagged queue
     const flaggedRes = await request(app)
       .get('/api/reviews/flagged')
       .set('Authorization', modToken);

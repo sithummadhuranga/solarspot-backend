@@ -1,23 +1,4 @@
-/**
- * Integration tests — Solar Intelligence endpoints
- *
- * solarService is mocked at the module level so this suite exercises the entire
- * HTTP layer (routing, auth middleware, validation, response shaping) without
- * hitting MongoDB or OWM.
- *
- * Covers all 9 routes:
- *   GET  /api/solar/stations/:stationId/live-weather  (public)
- *   GET  /api/solar/stations/:stationId/forecast      (public)
- *   GET  /api/solar/stations/:stationId/analytics     (public)
- *   GET  /api/solar/reports                           (public)
- *   POST /api/solar/reports                           (auth required)
- *   GET  /api/solar/reports/:id                       (public)
- *   PUT  /api/solar/reports/:id                       (auth required)
- *   DELETE /api/solar/reports/:id                     (auth required)
- *   PATCH  /api/solar/reports/:id/publish             (auth required)
- *
- * Owner: Member 3 · Ref: SolarIntelligence_Module_Prompt.md → A7
- */
+
 
 import request  from 'supertest';
 import jwt      from 'jsonwebtoken';
@@ -28,7 +9,6 @@ import { User } from '@modules/users/user.model';
 import { Role } from '@modules/permissions/role.model';
 import ApiError from '@utils/ApiError';
 
-// ── Mock solarService (isolate from Station/SolarReport model dependency) ────
 
 jest.mock('@modules/solar/solar.service', () => ({
   __esModule: true,
@@ -50,7 +30,6 @@ import solarService from '@modules/solar/solar.service';
 
 const mockSvc = solarService as jest.Mocked<typeof solarService>;
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const STATION_ID = new Types.ObjectId().toString();
 const REPORT_ID  = new Types.ObjectId().toString();
@@ -120,13 +99,11 @@ const fakePaginatedReports = {
   },
 };
 
-// ── Shared tokens ─────────────────────────────────────────────────────────────
 
 let adminToken:   string;
 let regularToken: string;
 let userId:       string;
 
-// ── Setup / teardown ──────────────────────────────────────────────────────────
 
 beforeAll(async () => {
   await connectTestDb();
@@ -209,9 +186,6 @@ beforeEach(() => {
   mockSvc.archiveReport.mockResolvedValue({ ...fakeReport, status: 'archived' } as never);
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /api/solar/stations/:stationId/live-weather  — PUBLIC
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('GET /api/solar/stations/:stationId/live-weather', () => {
   it('200 — returns live weather without auth', async () => {
@@ -236,9 +210,6 @@ describe('GET /api/solar/stations/:stationId/live-weather', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /api/solar/stations/:stationId/forecast  — PUBLIC
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('GET /api/solar/stations/:stationId/forecast', () => {
   it('200 — returns forecast data without auth', async () => {
@@ -257,9 +228,6 @@ describe('GET /api/solar/stations/:stationId/forecast', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /api/solar/stations/:stationId/analytics  — PUBLIC
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('GET /api/solar/stations/:stationId/analytics', () => {
   it('200 — returns analytics object without auth', async () => {
@@ -286,9 +254,6 @@ describe('GET /api/solar/stations/:stationId/analytics', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /api/solar/reports  — PUBLIC
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('GET /api/solar/reports', () => {
   it('200 — returns paginated reports without auth', async () => {
@@ -296,7 +261,6 @@ describe('GET /api/solar/reports', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // ApiResponse.paginated puts data array at top level, pagination as sibling
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body.pagination).toBeDefined();
   });
@@ -307,9 +271,6 @@ describe('GET /api/solar/reports', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// POST /api/solar/reports  — AUTH REQUIRED
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('POST /api/solar/reports', () => {
   const validBody = {
@@ -348,9 +309,6 @@ describe('POST /api/solar/reports', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /api/solar/reports/:id  — PUBLIC
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('GET /api/solar/reports/:id', () => {
   it('200 — returns report by id without auth', async () => {
@@ -375,9 +333,6 @@ describe('GET /api/solar/reports/:id', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// PUT /api/solar/reports/:id  — AUTH REQUIRED
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('PUT /api/solar/reports/:id', () => {
   it('200 — updates report when authenticated as owner', async () => {
@@ -412,9 +367,6 @@ describe('PUT /api/solar/reports/:id', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// DELETE /api/solar/reports/:id  — AUTH REQUIRED
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('DELETE /api/solar/reports/:id', () => {
   it('204 — soft-deletes report (no-content response)', async () => {
@@ -432,9 +384,6 @@ describe('DELETE /api/solar/reports/:id', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// PATCH /api/solar/reports/:id/publish  — AUTH REQUIRED
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('PATCH /api/solar/reports/:id/publish', () => {
   it('200 — publishes report when authenticated as owner', async () => {
@@ -465,9 +414,6 @@ describe('PATCH /api/solar/reports/:id/publish', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// PATCH /api/solar/reports/:id/archive  — AUTH REQUIRED
-// ══════════════════════════════════════════════════════════════════════════════
 
 describe('PATCH /api/solar/reports/:id/archive', () => {
   it('200 — archives a report for an admin-level caller', async () => {

@@ -1,7 +1,4 @@
-/**
- * Integration tests — Users endpoints
- * Ref: MASTER_PROMPT.md → Testing → Integration tests hit actual Express router + in-memory DB
- */
+
 
 import request  from 'supertest';
 import mongoose from 'mongoose';
@@ -18,7 +15,7 @@ let regularUserId: string;
 const REG_USER = { displayName: 'Regular User', email: `reg-${Date.now()}@test.com`, password: 'Regular1!' };
 const ADM_USER = { displayName: 'Admin User',   email: `adm-${Date.now()}@test.com`, password: 'Admin123!' };
 
-/** Register + force-verify email + login → return access token */
+
 async function registerAndLogin(payload: typeof REG_USER): Promise<{ token: string; userId: string }> {
   await request(app).post('/api/auth/register').send(payload);
   const user = await User.findOneAndUpdate(
@@ -36,22 +33,17 @@ beforeAll(async () => {
   await connectTestDb();
   await seedCore();
 
-  // Create regular user
   const reg = await registerAndLogin(REG_USER);
   userToken   = reg.token;
   regularUserId = reg.userId;
 
-  // Create admin user
   const adm = await registerAndLogin(ADM_USER);
   adminToken  = adm.token;
   adminUserId = adm.userId;
 
-  // Promote admin to 'admin' role so the JWT carries roleLevel=4 and the
-  // permission engine's admin bypass fires on every protected endpoint.
   const adminRole = await Role.findOne({ name: 'admin' }).lean();
   if (adminRole) {
     await User.findByIdAndUpdate(adminUserId, { role: adminRole._id });
-    // Re-login to embed the updated role ObjectId + roleLevel=4 into the token.
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: ADM_USER.email, password: ADM_USER.password });
@@ -63,7 +55,6 @@ afterAll(async () => {
   await disconnectTestDb();
 });
 
-// ─── GET /api/users/me ────────────────────────────────────────────────────────
 
 describe('GET /api/users/me', () => {
   it('200 — returns own profile', async () => {
@@ -81,7 +72,6 @@ describe('GET /api/users/me', () => {
   });
 });
 
-// ─── PUT /api/users/me ────────────────────────────────────────────────────────
 
 describe('PUT /api/users/me', () => {
   it('200 — updates own display name', async () => {
@@ -104,7 +94,6 @@ describe('PUT /api/users/me', () => {
   });
 });
 
-// ─── GET /api/users/:id ───────────────────────────────────────────────────────
 
 describe('GET /api/users/:id', () => {
   it('200 — returns user profile', async () => {
@@ -122,7 +111,6 @@ describe('GET /api/users/:id', () => {
   });
 });
 
-// ─── GET /api/users (list) ────────────────────────────────────────────────────
 
 describe('GET /api/users', () => {
   it('200 — admin can list users', async () => {
@@ -144,7 +132,6 @@ describe('GET /api/users', () => {
   });
 });
 
-// ─── PUT /api/users/:id ───────────────────────────────────────────────────────
 
 describe('PUT /api/users/:id (admin)', () => {
   it('200 — admin can ban a user', async () => {
@@ -167,11 +154,9 @@ describe('PUT /api/users/:id (admin)', () => {
   });
 });
 
-// ─── DELETE /api/users/me ─────────────────────────────────────────────────────
 
 describe('DELETE /api/users/me', () => {
   it('204 — soft-deletes own account', async () => {
-    // Create a throwaway user
     const throwaway = { displayName: 'Throwaway', email: `throw-${Date.now()}@example.com`, password: 'Delete1!' };
     const { token } = await registerAndLogin(throwaway);
 

@@ -1,10 +1,4 @@
-/**
- * Review model — Mongoose schema.
- *
- * Owner: Member 2
- * Ref: PROJECT_OVERVIEW.md → Database → reviews collection
- *      MASTER_PROMPT.md → ACID — post-save hook uses aggregation to recalculate station rating
- */
+
 
 import { Schema, model, Document, Types } from 'mongoose';
 import type { IReview } from '@/types';
@@ -13,14 +7,12 @@ import logger from '@utils/logger';
 
 const reviewSchema = new Schema<IReview & Document>(
   {
-    // ── Core ──────────────────────────────────────────────────────────────
     station: { type: Schema.Types.ObjectId, ref: 'Station', required: true, index: true },
     author:  { type: Schema.Types.ObjectId, ref: 'User',    required: true, index: true },
     rating:  { type: Number, required: true, min: 1, max: 5 },
     title:   { type: String, trim: true, maxlength: 120 },
     content: { type: String, required: true, trim: true, maxlength: 2000 },
 
-    // ── Moderation ────────────────────────────────────────────────────────
     moderationStatus: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'flagged'],
@@ -32,16 +24,13 @@ const reviewSchema = new Schema<IReview & Document>(
     moderatedAt:   { type: Date, default: null },
     moderationNote: { type: String, trim: true, maxlength: 500, default: null },
 
-    // ── Flagging ──────────────────────────────────────────────────────────
     isFlagged:  { type: Boolean, default: false },
     flaggedBy:  { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     flagCount:  { type: Number, default: 0, min: 0 },
 
-    // ── Helpful votes ─────────────────────────────────────────────────────
     helpfulVotes: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     helpfulCount: { type: Number, default: 0, min: 0 },
 
-    // ── Soft delete ──────────────────────────────────────────────────────
     isActive:  { type: Boolean, default: true },
     deletedAt: { type: Date, default: null },
     deletedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -49,18 +38,12 @@ const reviewSchema = new Schema<IReview & Document>(
   { timestamps: true },
 );
 
-// ── Indexes ──────────────────────────────────────────────────────────────────
-// One review per user per station — database-level guarantee
-// Partial unique index: only one *active* review per user per station.
-// Soft-deleted reviews (isActive: false) are excluded, allowing re-submission after deletion.
 reviewSchema.index(
   { station: 1, author: 1 },
   { unique: true, partialFilterExpression: { isActive: true } },
 );
 reviewSchema.index({ station: 1, moderationStatus: 1 });
 
-// ── Post-save hook — recalculate station.averageRating + reviewCount ─────────
-// Uses aggregation pipeline with $avg for accuracy (ACID: consistency rule)
 reviewSchema.post('save', async function () {
   const stationId = this.station;
   try {
@@ -72,7 +55,6 @@ reviewSchema.post('save', async function () {
     const avgRating  = agg ? Math.round(agg.avg * 10) / 10 : 0;
     const count      = agg?.count ?? 0;
 
-    // Atomic $set — no read-modify-write race condition
     await Station.findByIdAndUpdate(stationId, {
       $set: { averageRating: avgRating, reviewCount: count },
     });
@@ -81,12 +63,10 @@ reviewSchema.post('save', async function () {
   }
 });
 
-// Also recalculate on findOneAndUpdate (for soft-deletes, moderation changes)
 reviewSchema.post('findOneAndUpdate', async function () {
   const update = this.getUpdate() as Record<string, unknown> | null;
   const filter = this.getFilter();
 
-  // Only recalculate if the update affected fields that impact the rating
   const setFields = (update?.['$set'] ?? update) as Record<string, unknown> | undefined;
   const affectsRating =
     setFields?.isActive !== undefined ||

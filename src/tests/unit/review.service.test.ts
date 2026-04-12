@@ -1,13 +1,4 @@
-/**
- * Unit tests — ReviewService
- * Owner: Member 2
- *
- * Pattern mirrors station.service.test.ts — mocked models, no real DB.
- *
- * Toxicity scoring coverage:
- *   - HuggingFace AI path: global.fetch is mocked, config.HUGGINGFACE_API_KEY is set per-test
- *   - Local fallback: HUGGINGFACE_API_KEY absent (default test env), deterministic regex
- */
+
 
 import { Types } from 'mongoose';
 import * as reviewService from '@modules/reviews/review.service';
@@ -16,7 +7,7 @@ import { Station } from '@modules/stations/station.model';
 import { config } from '@config/env';
 import { container } from '@/container';
 
-/* ── Mocks ──────────────────────────────────────────────────────────────────── */
+
 
 
 jest.mock('@/container', () => ({
@@ -60,7 +51,7 @@ jest.mock('@utils/logger', () => ({
   },
 }));
 
-/* ── Test data ──────────────────────────────────────────────────────────────── */
+
 
 const AUTHOR_ID    = new Types.ObjectId().toString();
 const OTHER_ID     = new Types.ObjectId().toString();
@@ -123,7 +114,7 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-/* ── createReview ───────────────────────────────────────────────────────────── */
+
 
 describe('createReview', () => {
   const validInput = {
@@ -197,7 +188,6 @@ describe('createReview', () => {
   });
 
   it('throws 403 when trying to review own station', async () => {
-    // Station submitted by AUTHOR_ID
     (Station.findOne as jest.Mock).mockResolvedValue(
       makeMockStation({ submittedBy: new Types.ObjectId(AUTHOR_ID) }),
     );
@@ -210,7 +200,7 @@ describe('createReview', () => {
   });
 });
 
-/* ── getReviewById ──────────────────────────────────────────────────────────── */
+
 
 describe('getReviewById', () => {
   it('returns the review document for a valid ObjectId', async () => {
@@ -240,7 +230,7 @@ describe('getReviewById', () => {
   });
 });
 
-/* ── updateReview ───────────────────────────────────────────────────────────── */
+
 
 describe('updateReview', () => {
   it('allows author to update rating, title, and content', async () => {
@@ -285,7 +275,7 @@ describe('updateReview', () => {
   });
 });
 
-/* ── deleteReview ───────────────────────────────────────────────────────────── */
+
 
 describe('deleteReview', () => {
   it('soft-deletes via findOneAndUpdate with isActive:false, deletedAt, deletedBy', async () => {
@@ -343,7 +333,7 @@ describe('deleteReview', () => {
   });
 });
 
-/* ── toggleHelpful ──────────────────────────────────────────────────────────── */
+
 
 describe('toggleHelpful', () => {
   it('adds helpful vote when not already voted (returns action:added)', async () => {
@@ -404,7 +394,7 @@ describe('toggleHelpful', () => {
   });
 });
 
-/* ── flagReview ─────────────────────────────────────────────────────────────── */
+
 
 describe('flagReview', () => {
   it('flags a review and increments flagCount', async () => {
@@ -433,7 +423,6 @@ describe('flagReview', () => {
   });
 
   it('auto-escalates moderationStatus to "flagged" when threshold is reached', async () => {
-    // flagCount is already 2; adding one more hits the threshold of 3
     const reviewDoc = makeMockReview({
       author:    new Types.ObjectId(OTHER_ID),
       flaggedBy: [new Types.ObjectId(), new Types.ObjectId()],
@@ -445,7 +434,6 @@ describe('flagReview', () => {
     const result = await reviewService.flagReview(REVIEW_ID, AUTHOR_ID);
 
     expect(result.escalated).toBe(true);
-    // The $set payload must include the moderationStatus escalation
     const [[, updateArg]] = (Review.findOneAndUpdate as jest.Mock).mock.calls;
     expect(updateArg.$set).toMatchObject({ isFlagged: true, moderationStatus: 'flagged' });
   });
@@ -492,7 +480,7 @@ describe('flagReview', () => {
   });
 });
 
-/* ── listReviews ────────────────────────────────────────────────────────────── */
+
 
 describe('listReviews', () => {
   it('returns paginated result with default page/limit and approved filter', async () => {
@@ -567,7 +555,7 @@ describe('listReviews', () => {
   });
 });
 
-/* ── listFlaggedReviews ─────────────────────────────────────────────────────── */
+
 
 describe('listFlaggedReviews', () => {
   it('returns paginated flagged reviews sorted by flagCount desc', async () => {
@@ -587,13 +575,9 @@ describe('listFlaggedReviews', () => {
   });
 });
 
-/* ── listReviews — sort option branch coverage ──────────────────────────────── */
 
-/**
- * buildSort() has 5 cases; the 'newest' and default paths are already exercised
- * by the main listReviews suite above. These parameterised cases ensure the
- * remaining switch branches (oldest, highest, lowest, helpful) are covered.
- */
+
+
 describe('listReviews — sort option branches', () => {
   it.each([
     ['oldest',  { createdAt: 1 }],
@@ -609,13 +593,12 @@ describe('listReviews — sort option branches', () => {
 
       await reviewService.listReviews({ sort });
 
-      // The Mongoose query chain's .sort() must receive the expected sort document
       expect(chain.sort).toHaveBeenCalledWith(expectedSort);
     },
   );
 });
 
-/* ── moderateReview ─────────────────────────────────────────────────────────── */
+
 
 describe('moderateReview', () => {
   it('sets moderationStatus to approved and records moderator details', async () => {
@@ -679,14 +662,9 @@ describe('moderateReview', () => {
   });
 });
 
-/* ── createReview — HuggingFace AI moderation path ──────────────────────────── */
 
-/**
- * These tests exercise the HuggingFace toxic-bert path inside checkToxicity.
- * global.fetch is mocked per-test. Each test temporarily sets
- * config.HUGGINGFACE_API_KEY to a non-empty value so the service takes the AI path.
- * The quota service mock always returns canCall=true by default.
- */
+
+
 describe('createReview — HuggingFace AI moderation', () => {
   const hfInput = {
     station: STATION_ID,
@@ -700,10 +678,7 @@ describe('createReview — HuggingFace AI moderation', () => {
     (Review.findOne  as jest.Mock).mockResolvedValue(null);
   }
 
-  /**
-   * Builds a fetch mock that returns the HuggingFace toxic-bert response shape:
-   * [[{ label: 'toxic', score }, { label: 'non-toxic', score: 1-score }]]
-   */
+  
   function mockHFResponse(score: number): void {
     global.fetch = jest.fn().mockResolvedValue({
       ok:   true,
@@ -717,12 +692,10 @@ describe('createReview — HuggingFace AI moderation', () => {
   }
 
   beforeEach(() => {
-    // Enable HuggingFace path for every test in this describe block
     config.HUGGINGFACE_API_KEY = 'test-hf-key';
   });
 
   afterEach(() => {
-    // Reset so tests outside this block stay on the local scorer path
     config.HUGGINGFACE_API_KEY = '';
   });
 
@@ -779,7 +752,6 @@ describe('createReview — HuggingFace AI moderation', () => {
   it('falls back to local scorer when HuggingFace fetch throws a network error', async () => {
     setupCreateMocks();
     global.fetch = jest.fn().mockRejectedValue(new Error('ETIMEDOUT'));
-    // Clean content → local scorer returns 0 → approved
     (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
 
     await reviewService.createReview(AUTHOR_ID, {
@@ -788,7 +760,6 @@ describe('createReview — HuggingFace AI moderation', () => {
     });
 
     const arg = getCreateArg();
-    // Local scorer ran (not HuggingFace), score=0, status=approved
     expect(arg.moderationStatus).toBe('approved');
     expect(arg.toxicityScore).toBe(0);
   });
@@ -803,31 +774,15 @@ describe('createReview — HuggingFace AI moderation', () => {
       content: 'Reliable and well maintained station.',
     });
 
-    // HuggingFace was skipped — fetch should not have been called
     expect(global.fetch).not.toHaveBeenCalled();
     const arg = getCreateArg();
     expect(arg.moderationStatus).toBe('approved');
   });
 });
 
-/* ── createReview — local toxicity scoring branches ─────────────────────────── */
 
-/**
- * These tests exercise the local regex-based fallback scorer.
- * HUGGINGFACE_API_KEY is '' (not set) in the standard test environment,
- * so checkToxicity always takes the local path — no mocks needed.
- *
- * Score tiers (additive, capped at 1.0):
- *   Tier 1 — explicit threats      → +0.80
- *   Tier 2 — severe slurs/KYS      → +0.50
- *   Tier 3 — moderate profanity    → +0.25
- *   Tier 4 — structural signals    → up to +0.15
- *
- * Threshold mapping:
- *   score >= 0.80  → moderationStatus 'rejected'
- *   score 0.60–0.79 → moderationStatus 'pending'
- *   score < 0.60   → moderationStatus 'approved'
- */
+
+
 describe('createReview — local toxicity scoring', () => {
   function setupCreateMocks(): void {
     (Station.findOne as jest.Mock).mockResolvedValue(makeMockStation());
@@ -862,7 +817,6 @@ describe('createReview — local toxicity scoring', () => {
       station: STATION_ID,
       rating:  1,
       title:   'Borderline review',
-      // tier2: "go kill yourself" (+0.50)  tier3: "you idiot" (+0.25)  = 0.75
       content: 'Go kill yourself you idiot',
     });
 
@@ -888,8 +842,6 @@ describe('createReview — local toxicity scoring', () => {
   });
 
   it('includes toxicityScore=0 in create args — not omitted when score is zero', async () => {
-    // The spread `...(toxicityScore !== null && { toxicityScore })` evaluates `0 !== null`
-    // as true, so toxicityScore=0 must be present (not undefined).
     setupCreateMocks();
     (Review.create as jest.Mock).mockResolvedValue(makeMockReview());
 
@@ -925,7 +877,6 @@ describe('createReview — local toxicity scoring', () => {
     setupCreateMocks();
     (Review.create as jest.Mock).mockResolvedValue(makeMockReview({ moderationStatus: 'approved' }));
 
-    // All-caps ratio > 0.6 with length > 20 → +0.10; aggressive punct (≥2 runs of 3+) → +0.05
     const shouted = 'THIS STATION WAS TERRIBLE AND I HATED IT!!!! WORST EXPERIENCE EVER!!!!!';
     await reviewService.createReview(AUTHOR_ID, {
       station: STATION_ID,
@@ -941,19 +892,9 @@ describe('createReview — local toxicity scoring', () => {
   });
 });
 
-/* ── createReview — title moderation coverage ───────────────────────────────── */
 
-/**
- * These tests verify that the review TITLE is included in the toxicity screening.
- * Previously only the body content was screened; a user could submit a clean body
- * with a toxic title and it would pass moderation.
- *
- * The fix combines title + content into a single string before calling
- * checkToxicity(), so either field alone can trigger rejection or pending.
- *
- * All tests in this block run with HUGGINGFACE_API_KEY='' so the local regex
- * scorer is used — no fetch mocking required.
- */
+
+
 describe('createReview — title moderation', () => {
   function setupCreateMocks(): void {
     (Station.findOne as jest.Mock).mockResolvedValue(makeMockStation());
@@ -987,7 +928,6 @@ describe('createReview — title moderation', () => {
     await reviewService.createReview(AUTHOR_ID, {
       station: STATION_ID,
       rating:  1,
-      // tier-2 (go kill yourself +0.50) + tier-3 (you idiot +0.25) = 0.75 in title
       title:   'Go kill yourself you idiot',
       content: 'The station itself was fine.',  // clean body
     });
@@ -1014,13 +954,9 @@ describe('createReview — title moderation', () => {
   });
 });
 
-/* ── updateReview — title moderation coverage ───────────────────────────────── */
 
-/**
- * These tests verify that editing a review's TITLE re-triggers toxicity
- * screening even when the body content is unchanged.
- * Previously only a content change would trigger re-screening.
- */
+
+
 describe('updateReview — title moderation', () => {
   it('rejects the update when the new title contains an explicit threat', async () => {
     const reviewDoc = makeMockReview({ author: new Types.ObjectId(AUTHOR_ID) });
@@ -1040,7 +976,6 @@ describe('updateReview — title moderation', () => {
     (Review.findOne as jest.Mock).mockResolvedValue(reviewDoc);
 
     await reviewService.updateReview(REVIEW_ID, AUTHOR_ID, {
-      // Go kill yourself (+0.50) + you idiot (+0.25) = 0.75 → pending
       title: 'Go kill yourself you idiot',
     });
 
@@ -1052,14 +987,11 @@ describe('updateReview — title moderation', () => {
     const reviewDoc = makeMockReview({ author: new Types.ObjectId(AUTHOR_ID) });
     (Review.findOne as jest.Mock).mockResolvedValue(reviewDoc);
 
-    // A rating-only update must NOT call HuggingFace or local scorer.
-    // If it did, it would consume quota unnecessarily.
     const fetchSpy = jest.spyOn(global, 'fetch');
 
     await reviewService.updateReview(REVIEW_ID, AUTHOR_ID, { rating: 3 });
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    // moderationStatus should be unchanged from the original 'approved'
     expect(reviewDoc.moderationStatus).toBe('approved');
     expect(reviewDoc.save).toHaveBeenCalledTimes(1);
 

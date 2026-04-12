@@ -1,14 +1,4 @@
-/**
- * Seeder 04 — role_permissions
- *
- * Owner: Member 4
- * Links permissions (and their policies) to roles.
- *
- * Ref: PROJECT_OVERVIEW.md → Database → role_permissions collection
- *
- * Depends on: 01_permissions, 02_policies, 03_roles
- * Data is additive (upsert by { role, permission }) — safe to re-run.
- */
+
 
 import { ClientSession } from 'mongoose';
 import { Role }           from '@modules/permissions/role.model';
@@ -18,9 +8,6 @@ import { RolePermission } from '@modules/permissions/role_permission.model';
 import logger from '@utils/logger';
 import type { PermissionAction } from '@/types';
 
-// ─── Role → permissions → policies matrix ────────────────────────────────────
-// Format: [roleName, permissionAction, policySlugs[]]
-// Ref: PROJECT_OVERVIEW.md → Roles table + API Endpoint auth column
 type RolePermEntry = [string, PermissionAction, string[]];
 
 const GUEST_PERMS: RolePermEntry[] = [
@@ -55,26 +42,20 @@ const ROLE_PERM_MATRIX: RolePermEntry[] = [
   ...GUEST_PERMS,
   ...USER_BASE_PERMS,
   ...STATION_OWNER_PERMS,
-  // featured_contributor: same as station_owner
   ...STATION_OWNER_PERMS.map(([, a, p]) => ['featured_contributor', a, p] as RolePermEntry),
-  // trusted_reviewer: same as user
   ...USER_BASE_PERMS.map(([, a, p]) => ['trusted_reviewer', a, p] as RolePermEntry),
-  // review_moderator: user + review moderation
   ...USER_BASE_PERMS.map(([, a, p]) => ['review_moderator', a, p] as RolePermEntry),
   ['review_moderator', 'reviews.read-flagged', []],
   ['review_moderator', 'reviews.delete-any',   []],
   ['review_moderator', 'reviews.moderate',     []],
-  // weather_analyst: user + weather admin
   ...USER_BASE_PERMS.map(([, a, p]) => ['weather_analyst', a, p] as RolePermEntry),
   ['weather_analyst', 'weather.admin',        []],
   ['weather_analyst', 'weather.bulk-refresh', []],
   ['weather_analyst', 'weather.export',       []],
-  // permission_auditor: user + audit/quota read
   ...USER_BASE_PERMS.map(([, a, p]) => ['permission_auditor', a, p] as RolePermEntry),
   ['permission_auditor', 'permissions.read', []],
   ['permission_auditor', 'audit.read',       []],
   ['permission_auditor', 'quotas.read',      []],
-  // moderator: full management (no policies — moderators are trusted)
   ['moderator', 'stations.read',         []], ['moderator', 'stations.read-pending', []],
   ['moderator', 'stations.create',       ['email_verified_only', 'active_account_only']],
   ['moderator', 'stations.edit-own',     ['owner_match_station']], ['moderator', 'stations.delete-own', ['owner_match_station']],
@@ -91,7 +72,6 @@ const ROLE_PERM_MATRIX: RolePermEntry[] = [
   ['moderator', 'users.edit-own',        ['owner_match_user']], ['moderator', 'users.read-list', []], ['moderator', 'users.manage', []],
   ['moderator', 'permissions.read',      []], ['moderator', 'audit.read', []], ['moderator', 'quotas.read', []],
   ['moderator', 'notifications.read-own', ['owner_match_notification']],
-  // admin: all permissions (engine already bypasses policies for roleLevel >= 4)
   ['admin', 'stations.read', []], ['admin', 'stations.read-pending', []], ['admin', 'stations.create', []],
   ['admin', 'stations.edit-own', []], ['admin', 'stations.delete-own', []], ['admin', 'stations.edit-any', []], ['admin', 'stations.delete-any', []],
   ['admin', 'stations.approve', []], ['admin', 'stations.reject', []], ['admin', 'stations.feature', []], ['admin', 'stations.feature-request', []], ['admin', 'stations.view-stats-own', []],
@@ -103,7 +83,6 @@ const ROLE_PERM_MATRIX: RolePermEntry[] = [
 ];
 
 export async function seedRolePermissions(session: ClientSession): Promise<void> {
-  // Load lookup maps
   const roles       = await Role.find().lean();
   const permissions = await Permission.find().lean();
   const policies    = await Policy.find().lean();

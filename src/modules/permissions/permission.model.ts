@@ -1,9 +1,4 @@
-/**
- * Permission model — one document per permission action string.
- *
- * Ref: PROJECT_OVERVIEW.md → RBAC → Permissions (35 defined)
- *      MASTER_PROMPT.md → SOLID OCP — never modify existing permission docs, only add
- */
+
 
 import { Schema, model } from 'mongoose';
 import type { IPermission } from '@/types';
@@ -33,7 +28,6 @@ const permissionSchema = new Schema<IPermission>(
   { timestamps: true },
 );
 
-// action index already created by `unique: true` on the field — only add non-duplicate indexes
 permissionSchema.index({ resource: 1 });
 permissionSchema.index({ component: 1 });
 

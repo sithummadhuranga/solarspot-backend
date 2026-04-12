@@ -1,8 +1,5 @@
 name: Deploy to Render
 
-# Only runs after the CI workflow completes — never deploys if CI fails.
-# This means every merge to main must pass lint, typecheck, tests, and build
-# before a single byte reaches production.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -13,12 +10,10 @@ jobs:
   deploy:
     name: Deploy to Render (production)
     runs-on: ubuntu-latest
-    # Guard: skip if the CI run that triggered this workflow did not succeed.
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     environment: production
 
     steps:
-      # ── 1. Trigger Render deploy via the deploy hook ───────────────────────
       - name: Trigger Render deploy hook
         run: |
           RESPONSE=$(curl --silent --show-error --fail \
@@ -32,9 +27,6 @@ jobs:
           fi
           echo "✅ Deploy hook accepted (HTTP $HTTP_STATUS) — Render is building..."
 
-      # ── 2. Poll the health endpoint until the new version is live ─────────
-      # Render free plan cold-starts can take 3-4 minutes on first deploy.
-      # We retry every 20 s for up to 5 minutes (15 attempts).
       - name: Wait for deployment to become healthy
         run: |
           BASE_URL="${{ secrets.RENDER_API_URL }}"
@@ -65,7 +57,6 @@ jobs:
           echo "   Check Render dashboard for build/deploy logs."
           exit 1
 
-      # ── 3. Confirm the deployed version details ────────────────────────────
       - name: Print health response
         if: success()
         run: |

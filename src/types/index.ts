@@ -1,10 +1,4 @@
-/**
- * Centralised type exports — import from '@types' not from individual files.
- *
- * Usage:
- *   import { IUser, IStation, AuthRequest, EvaluationResult } from '@/types';
- *   import type { WeatherData, BestTimeSlot } from '@/types';
- */
+
 
 export * from './common.types';
 export * from './user.types';

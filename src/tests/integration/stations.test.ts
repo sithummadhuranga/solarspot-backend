@@ -45,10 +45,6 @@ beforeAll(async () => {
   await connectTestDb();
   await seedCore();
 
-  // Bypass the RBAC permission engine — these test JWT tokens embed slug strings
-  // ('moderator') rather than ObjectIds, so the real engine would find no role
-  // permissions. We replicate the correct RBAC outcome: moderator-only actions
-  // are denied for 'user' role tokens; everything else is allowed.
   const MOD_ONLY_PERMS = new Set([
     'stations.read-pending',
     'stations.approve',

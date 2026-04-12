@@ -1,14 +1,4 @@
-/**
- * Seeder 05 — demo_users
- *
- * Owner: Member 4
- * Seeds 5 demo user accounts for development and evaluation.
- *
- * Ref: PROJECT_OVERVIEW.md → Demo Credentials
- *
- * Depends on: 03_roles
- * ⚠️  DEV ONLY — never run seed:demo in production (demo:reset clears the DB first)
- */
+
 
 import bcrypt from 'bcryptjs';
 import { ClientSession } from 'mongoose';
@@ -16,8 +6,6 @@ import { User } from '@modules/users/user.model';
 import { Role } from '@modules/permissions/role.model';
 import logger from '@utils/logger';
 
-// ─── Demo credentials ────────────────────────────────────────────────────────
-// Ref: PROJECT_OVERVIEW.md → Demo Credentials
 export const DEMO_USERS = [
   { email: 'admin@solarspot.app',       password: 'Admin@2026!',  role: 'admin',         displayName: 'Admin User',     isEmailVerified: true  },
   { email: 'mod@solarspot.app',         password: 'Mod@2026!',    role: 'moderator',     displayName: 'Mod User',       isEmailVerified: true  },

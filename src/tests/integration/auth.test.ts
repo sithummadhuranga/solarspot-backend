@@ -1,8 +1,4 @@
-/**
- * Integration tests — Auth endpoints
- * Ref: MASTER_PROMPT.md → Testing → Integration tests hit actual Express router + in-memory DB
- *      Uses MongoMemoryReplSet (replica set) to support Mongoose transactions
- */
+
 
 import request  from 'supertest';
 import crypto   from 'crypto';
@@ -10,7 +6,6 @@ import app      from '../../../app';
 import { connectTestDb, disconnectTestDb, seedCore } from './helpers';
 import { User }                                                    from '@modules/users/user.model';
 
-// Keep the refresh cookie between tests that need it
 let refreshCookie: string;
 let _verifyToken: string; // captured for future email-verification flow tests
 
@@ -30,10 +25,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // Only clear non-RBAC collections between suites, not here — handled per-describe
 });
 
-// ─── POST /api/auth/register ─────────────────────────────────────────────────
 
 describe('POST /api/auth/register', () => {
   it('201 — returns confirmation message', async () => {
@@ -71,7 +64,6 @@ describe('POST /api/auth/register', () => {
   });
 });
 
-// ─── POST /api/auth/login (before verify) ─────────────────────────────────────
 
 describe('POST /api/auth/login — email not verified', () => {
   it('401 — user registered but email not yet verified', async () => {
@@ -83,13 +75,10 @@ describe('POST /api/auth/login — email not verified', () => {
   });
 });
 
-// ─── GET /api/auth/verify-email/:token ────────────────────────────────────────
 
 describe('GET /api/auth/verify-email/:token', () => {
   beforeAll(async () => {
-    // Read the raw token from the DB to simulate clicking the email link
     const user = await User.findOne({ email: VALID_USER.email }).select('+emailVerifyToken').lean();
-    // token is stored as hash — find it via the raw token field if stored, otherwise skip
     _verifyToken = (user as unknown as Record<string, unknown>)?.emailVerifyTokenRaw as string ?? 'invalid-token';
   });
 
@@ -99,13 +88,11 @@ describe('GET /api/auth/verify-email/:token', () => {
   });
 });
 
-// ─── POST /api/auth/login (verified user) ─────────────────────────────────────
 
 describe('POST /api/auth/login — verified user', () => {
   let _accessToken: string;
 
   beforeAll(async () => {
-    // Force-verify the test user so we can test login properly
     await User.findOneAndUpdate(
       { email: VALID_USER.email },
       { isEmailVerified: true, $unset: { emailVerifyToken: 1, emailVerifyExpires: 1 } },
@@ -135,12 +122,10 @@ describe('POST /api/auth/login — verified user', () => {
   });
 });
 
-// ─── POST /api/auth/refresh ─────────────────────────────────────────────────
 
 describe('POST /api/auth/refresh', () => {
   it('200 — returns new access token and rotates cookie', async () => {
     if (!refreshCookie) {
-      // Re-login to get cookie if prior test didn't set it
       const res = await request(app)
         .post('/api/auth/login')
         .send({ email: VALID_USER.email, password: VALID_USER.password });
@@ -162,11 +147,9 @@ describe('POST /api/auth/refresh', () => {
   });
 });
 
-// ─── POST /api/auth/logout ────────────────────────────────────────────────────
 
 describe('POST /api/auth/logout', () => {
   it('204 — clears refresh cookie', async () => {
-    // Login fresh
     const loginRes = await request(app)
       .post('/api/auth/login')
       .send({ email: VALID_USER.email, password: VALID_USER.password });
@@ -186,7 +169,6 @@ describe('POST /api/auth/logout', () => {
   });
 });
 
-// ─── POST /api/auth/forgot-password ──────────────────────────────────────────
 
 describe('POST /api/auth/forgot-password', () => {
   it('200 — always succeeds (no email leakage)', async () => {
@@ -194,7 +176,6 @@ describe('POST /api/auth/forgot-password', () => {
       .post('/api/auth/forgot-password')
       .send({ email: 'nobody-ever@nonexistent.com' });
 
-    // Should not reveal whether email exists
     expect([200, 204]).toContain(res.status);
   });
 
@@ -207,7 +188,6 @@ describe('POST /api/auth/forgot-password', () => {
   });
 });
 
-// ─── PATCH /api/auth/reset-password/:token ────────────────────────────────────
 
 describe('PATCH /api/auth/reset-password/:token', () => {
   it('400 — expired / invalid token', async () => {

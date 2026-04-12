@@ -9,9 +9,7 @@ interface PaginationMeta {
   hasPrev: boolean;
 }
 
-/**
- * ApiResponse — standardised JSON response helpers.
- */
+
 class ApiResponse {
   static success<T>(
     res: Response,
@@ -50,10 +48,7 @@ class ApiResponse {
     });
   }
 
-  /**
-   * error — returns a plain error envelope object (does NOT send the response).
-   * Usage: res.status(4xx).json(ApiResponse.error('CODE', 'message'))
-   */
+  
   static error(
     code: string,
     message: string

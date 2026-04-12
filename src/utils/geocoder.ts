@@ -11,17 +11,13 @@ export interface GeoResult {
   postalCode: string | null;
 }
 
-/**
- * IGeocoder — DI interface consumed by container.ts.
- */
+
 export interface IGeocoder {
   forward(address: string): Promise<GeoResult | null>;
   reverse(lat: number, lng: number): Promise<GeoResult | null>;
 }
 
-/**
- * NominatimGeocoder — concrete implementation using OpenStreetMap Nominatim.
- */
+
 export class NominatimGeocoder implements IGeocoder {
   async forward(address: string): Promise<GeoResult | null> {
     return forwardGeocode(address);
@@ -32,7 +28,6 @@ export class NominatimGeocoder implements IGeocoder {
   }
 }
 
-// Shared Axios headers — Nominatim requires a User-Agent
 const HEADERS = { 'User-Agent': 'SolarSpot/1.0 (contact@solarspot.app)', 'Accept-Language': 'en' };
 
 function parseAddress(addr: Record<string, string>): Pick<GeoResult, 'street' | 'city' | 'district' | 'country' | 'postalCode'> {
@@ -45,9 +40,7 @@ function parseAddress(addr: Record<string, string>): Pick<GeoResult, 'street' | 
   };
 }
 
-/**
- * forwardGeocode — converts a human-readable address string to coordinates.
- */
+
 export async function forwardGeocode(address: string): Promise<GeoResult | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&addressdetails=1`;
@@ -69,9 +62,7 @@ export async function forwardGeocode(address: string): Promise<GeoResult | null>
   }
 }
 
-/**
- * reverseGeocode — converts coordinates to a human-readable address.
- */
+
 export async function reverseGeocode(lat: number, lng: number): Promise<GeoResult | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;

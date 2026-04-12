@@ -1,11 +1,7 @@
-/**
- * Unit tests — UserService
- * Ref: MASTER_PROMPT.md → Testing — Unit tests must mock all external deps (DB, Email, HTTP)
- */
+
 
 import { Types } from 'mongoose';
 
-// ─── Mocks ───────────────────────────────────────────────────────────────────
 
 jest.mock('@modules/users/user.model', () => ({
   User: {
@@ -57,7 +53,6 @@ const fakeUserDoc = {
 
 beforeEach(() => jest.clearAllMocks());
 
-// ─── getMe ────────────────────────────────────────────────────────────────────
 
 describe('UserService.getMe', () => {
   it('should return the user profile', async () => {
@@ -78,7 +73,6 @@ describe('UserService.getMe', () => {
   });
 });
 
-// ─── updateMe ─────────────────────────────────────────────────────────────────
 
 describe('UserService.updateMe', () => {
   it('should update and return updated user', async () => {
@@ -97,7 +91,6 @@ describe('UserService.updateMe', () => {
   });
 });
 
-// ─── deleteMe ─────────────────────────────────────────────────────────────────
 
 describe('UserService.deleteMe', () => {
   it('should soft-delete the account', async () => {
@@ -110,7 +103,6 @@ describe('UserService.deleteMe', () => {
   });
 });
 
-// ─── listUsers ────────────────────────────────────────────────────────────────
 
 describe('UserService.listUsers', () => {
   it('should return paginated users', async () => {
@@ -129,7 +121,6 @@ describe('UserService.listUsers', () => {
   });
 });
 
-// ─── getUserById ──────────────────────────────────────────────────────────────
 
 describe('UserService.getUserById', () => {
   it('should return an active user', async () => {
@@ -150,7 +141,6 @@ describe('UserService.getUserById', () => {
   });
 });
 
-// ─── adminUpdateUser ──────────────────────────────────────────────────────────
 
 describe('UserService.adminUpdateUser', () => {
   it('should update isBanned and write audit log', async () => {

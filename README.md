@@ -4,6 +4,13 @@
 
 Solar charging station finder REST API built with Express.js and TypeScript for SE3040 Application Frameworks.
 
+## Documentation
+
+- [Backend Deployment Guide](BACKEND_DEPLOYMENT_GUIDE.md)
+- [Backend Testing Guide](TESTING_GUIDE.md)
+- [Local Development Guide](LOCAL_DEV.md)
+- [Postman Testing Guide](POSTMAN_TESTING.md)
+
 ## Prerequisites
 
 - Node.js 20 LTS
@@ -24,7 +31,6 @@ API runs at `http://localhost:5000`, Mongo Express UI at `http://localhost:8081`
 
 ```bash
 npm install
-# fill in .env with your values
 npm run dev
 ```
 
@@ -108,20 +114,20 @@ npm run dev
 ## Docker
 
 ```bash
-docker-compose up -d              # start all services
-docker-compose down               # stop
-docker-compose logs -f backend    # tail logs
-docker-compose up --build         # rebuild after changes
-docker exec -it solarspot_backend sh  # shell into container
+docker-compose up -d
+docker-compose down
+docker-compose logs -f backend
+docker-compose up --build
+docker exec -it solarspot_backend sh
 ```
 
 ## Testing
 
 ```bash
-npm run test:unit                         # unit tests
-npm run test:integration                  # integration tests
-npm run test:coverage                     # coverage report
-npx artillery run src/tests/performance/artillery.yml  # load test
+npm run test:unit
+npm run test:integration
+npm run test:coverage
+npx artillery run src/tests/performance/artillery.yml
 ```
 
 ## Deployment
@@ -146,12 +152,12 @@ SMTP remains supported for local development and paid Render instances.
 
 ## Team — Module Ownership
 
-| Member | Module | 3rd-Party API |
-|--------|--------|---------------|
-| Member 1 | Station Management | Nominatim Geocoding |
-| Member 2 | Review System | Google Perspective API |
-| Member 3 | Weather Intelligence | OpenWeatherMap API |
-| Member 4 | Auth & Users | Brevo SMTP |
+| Member | Module |
+|--------|--------|
+| Sathush Nanyakkara (@sathufit) | Station Management |
+| Nimnath Nadushka (@nnimnath) | Review System |
+| Sithum Madhuranga (@sithummadhuranga) | Weather Intelligence |
+| Christine Lowe (@christineshwethalowe) | Auth & Users |
 
 ## Git Workflow
 

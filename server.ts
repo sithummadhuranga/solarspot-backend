@@ -1,23 +1,13 @@
-/**
- * SolarSpot — Entry point
- *
- * Boot order:
- *  1. Load & validate environment variables
- *  2. Connect to MongoDB
- *  3. Start HTTP server
- *  4. Register graceful-shutdown hooks
- */
+
 
 import { config } from '@config/env';
 import { connectDB } from '@config/db';
 import logger from '@utils/logger';
 
-// ─── Validate required environment variables before anything else ──────────────
 const REQUIRED_VARS: (keyof typeof config)[] = [
   'MONGODB_URI',
   'JWT_SECRET',
   'COOKIE_SECRET',
-  // JWT_REFRESH_EXPIRES is validated by Joi schema in env.ts, no separate refresh secret needed.
 ];
 
 const missing = REQUIRED_VARS.filter((key) => !config[key]);
@@ -26,7 +16,6 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-// ─── Security validation (fail-fast) ─────────────────────────────────────────
 function isLocalhostOrigin(origin: string): boolean {
   return /^http:\/\/localhost:\d+$/.test(origin);
 }
@@ -34,7 +23,6 @@ function isLocalhostOrigin(origin: string): boolean {
 function isValidOrigin(origin: string): boolean {
   try {
     const u = new URL(origin);
-    // Must be an origin only (no path/query/fragment)
     if (u.origin !== origin) return false;
     return u.protocol === 'http:' || u.protocol === 'https:';
   } catch {
@@ -59,7 +47,6 @@ for (const origin of corsOrigins) {
     process.exit(1);
   }
 
-  // Production must be HTTPS-only (localhost allowed only for non-production)
   if (config.NODE_ENV === 'production') {
     const u = new URL(origin);
     if (u.protocol !== 'https:') {
@@ -67,14 +54,12 @@ for (const origin of corsOrigins) {
       process.exit(1);
     }
   } else {
-    // Non-production: allow localhost http for dev
     if (origin.startsWith('http://') && !isLocalhostOrigin(origin)) {
       logger.warn(`CORS warning: non-HTTPS non-localhost origin allowed: "${origin}"`);
     }
   }
 }
 
-// ─── Import app AFTER env is validated ────────────────────────────────────────
 import app from './app';
 import http from 'http';
 import { runSeedersOnExistingConnection, SeedMode } from './src/seed/runner';
@@ -127,7 +112,6 @@ async function ensureSeededState(): Promise<void> {
   );
 }
 
-// ─── Graceful shutdown helper ──────────────────────────────────────────────────
 function gracefulShutdown(signal: string): void {
   logger.info(`${signal} received — shutting down gracefully`);
 
@@ -140,31 +124,25 @@ function gracefulShutdown(signal: string): void {
     process.exit(0);
   });
 
-  // Force exit if shutdown takes longer than 10 s
   setTimeout(() => {
     logger.error('Forced shutdown after timeout');
     process.exit(1);
   }, 10_000).unref();
 }
 
-// ─── Unhandled promise rejections ─────────────────────────────────────────────
 process.on('unhandledRejection', (reason: unknown) => {
   logger.error('Unhandled promise rejection:', reason);
-  // Let existing requests finish, then exit
   server.close(() => process.exit(1));
 });
 
-// ─── Uncaught exceptions ──────────────────────────────────────────────────────
 process.on('uncaughtException', (error: Error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
 });
 
-// ─── OS termination signals ───────────────────────────────────────────────────
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM')); // Docker / cloud stop
 process.on('SIGINT',  () => gracefulShutdown('SIGINT'));  // Ctrl-C
 
-// ─── Bootstrap ────────────────────────────────────────────────────────────────
 (async () => {
   try {
     await connectDB();

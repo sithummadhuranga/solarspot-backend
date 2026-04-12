@@ -1,10 +1,4 @@
-/**
- * Auth routes — 7 endpoints.
- *
- * Ref: PROJECT_OVERVIEW.md → API Endpoints → Auth (7 endpoints)
- *      MASTER_PROMPT.md → Route Middleware Order — Always This Exact Sequence
- *      MASTER_PROMPT.md → Security → Rate Limiting (authLimiter on all auth routes)
- */
+
 
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';

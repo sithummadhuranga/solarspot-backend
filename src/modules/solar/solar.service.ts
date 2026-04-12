@@ -1,8 +1,4 @@
-/**
- * Solar service — business logic for the Solar Intelligence module.
- *
- * Ref: SolarIntelligence_Module_Prompt.md → A3
- */
+
 
 import mongoose, { Types } from 'mongoose';
 import { AuditLog } from '@modules/permissions/audit_log.model';
@@ -400,18 +396,16 @@ export async function getReports(
     filter['visitedAt'] = range;
   }
 
-  if (canModerateSolarReports(viewer)) {
-    // full visibility for moderators/admins
-  } else if (viewer?._id && requestedUserId === viewer._id) {
-    // own report management view
-  } else if (viewer?._id) {
-    filter['$or'] = [
-      { status: 'published', isPublic: true },
-      { submittedBy: new Types.ObjectId(viewer._id) },
-    ];
-  } else {
-    filter['status'] = 'published';
-    filter['isPublic'] = true;
+  if (!canModerateSolarReports(viewer) && !(viewer?._id && requestedUserId === viewer._id)) {
+    if (viewer?._id) {
+      filter['$or'] = [
+        { status: 'published', isPublic: true },
+        { submittedBy: new Types.ObjectId(viewer._id) },
+      ];
+    } else {
+      filter['status'] = 'published';
+      filter['isPublic'] = true;
+    }
   }
 
   const sortMap: Record<string, Record<string, 1 | -1>> = {
